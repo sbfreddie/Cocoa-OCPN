@@ -27,60 +27,55 @@ a.  Opencpn was built with the following objectives in mind.
     Opencpn is in primary daily use as the navigation package aboard
     M/V Dyad, a 48 ft trawler yacht cruising from Newfoundland to the
     Bahamas yearly.
-----------------------------------------------------------------------
-2. Eigene Bemerkungen
-----------------------------------------------------------------------
-Warum überhaupt diese eigene OpenCPN Version?
-  Zunächst gab es jahrelang überhaupt keine Version für Mac OS X.
-  Es war mühsam aufgrund früherer Versuche den Quellcode für OS X zu
-  kompilieren. Die daraus gewonnenen Erkenntnisse wollten die Programmierer
-  von OpenCPN zunächst nicht übernehmen. Erst später wurde dann erkannt,
-  daß z.B. nur neuere Versionen von wxWidgets für Mac OS X verwendet
-  werden können und daß z.B. eine Steuerung über Menüs doch nicht so
-  schlecht ist. Viele Texte im Quellcode waren nicht übersetzbar und
-  das Hilfesystem wie auch andere Funktionen entsprachen nicht dem bei
-  Apple gewohnten Umfeld. Weitere Abweichungen zum Original Code sind:
 
-a. Diese Version von OCPN ist eine rein deutsche Version für Mac OS X
-   (jetzt macOS) Mojave (10.14) und Catalina (10.15).
-   Es soll soweit wie möglich das macOS Betriebssystem unterstützt werden,
-   einschl. Mac Menüs, Mac Hilfe usw. Nur noch Mojave und Catalina werden
-   unterstützt, ältere Versionen nicht mehr. Weder Big Sur noch Macs mit
-   M1 Chip sind bisher getestet.
-   Vermutlich wird es für neuere Versionen von macOS in absehbarer Zeit
-   überhaupt keine OpenCPN Version mehr geben können, da die Grafik-
-   Bibliothek OpenGL von Apple bald nicht mehr unterstützt wird.
+-------------------------------------------------- --------------------
+2. CarCode's Own remarks.  (In English)
+-------------------------------------------------- --------------------
+Why this version OpenCPN at all?
+  Initially, there was no version for Mac OS X for years.
+  It was tedious to get the source code for OS X due to previous attempts
+  to compile. The programmers wanted the knowledge gained from this
+  from OpenCPN initially do not accept. Only later was it recognized
+  that only newer versions of wxWidgets will work for Mac OS X,
+  and that control via menus is not so bad. 
+  Many text strings in the source code were not translatable and
+  the help system as well as other functions did not correspond to
+  Apple's familiar environment. Other deviations from the original code are:
 
-b. Diese Version basiert auf Release-Version von wxWidgets 3.1.5 mit
-   entsprechenden dylibs vom 08. März 2021. Die Einbindung der Libs als
-   statisch wurde verworfen, da damit das Gesamt-Paket unnötig aufgebläht
-   werden würde.
+   a. This version of OCPN is a purely German version for Mac OS X
+    (now macOS) Mojave (10.14) and Catalina (10.15).
+    The macOS operating system should be supported as far as possible,
+    including Mac menus, Mac help, etc. Only Mojave and Catalina will be
+    supported, older versions will no longer be supported. Neither Big Sur
+    nor Macs with M1 chips have been tested so far.
+    Presumably it will not work for newer versions of macOS anytime soon,
+    because Apple's OpenGL library soon will no longer be supported. (Deprecated)
 
-c. In einem weiteren Schritt wurde mit Veröffentlichung einer Binär-Version
-   von OCPN für Mac ein automatischer Update-Service mit Sparkle eingeführt.
+    b. This version is based on the release version of wxWidgets (3.1.5) with
+    corresponding dylibs from March 8th 2021. The integration of the libs as
+    Static was discarded, as this unnecessarily inflated the entire package.
 
-d. Nicht alle Plugins laufen bisher problemlos. Einige wurden noch nicht
-   compiliert, andere haben noch Fehler.
+    c. In a further step, a binary version of OCPN for Mac introduced an
+    automatic update service with Sparkle (Mac Only).
 
-e. Außer dem o.g. Problem, wegen der Plugins nur die dynamischen Libraries von
-   wxWidgets zu verwenden, hat das Plugin-Konzept noch weitere Nachteile
-   offenbart: Zur Laufzeit werden die verschiedenen Locale-Dateien von OCPN
-   und den Plugins verbunden, so daß gleichartige Strings mit unterschiedlichen
-   Übersetzungen zu Fehlern führen.
+    d. Not all plugins are running smoothly so far. Some haven't been
+    compiled, others still have errors.
 
-f. Das von den OCPN Programmierern gewünschte Konzept, die Plugins als
-   Stand-Alone zu compilieren, wurde wieder verlassen, da es zu größeren
-   Plugin Dateien führt und nur Vorteile bietet, wenn Plugins mit verschiedenen
-   OCPN Versionen laufen sollen. Außerdem wird es umständlicher, Code-
-   Änderungen an mehreren Stellen nachzuhalten wie z.B. bei den wxJSON
-   Dateien.
-   Außerdem wurde das neue Konzept des OpenCPN Originals für Updates von
-   Plugins nicht übernommen, da immer noch nicht ausgereift und sehr
-   fehleranfällig. Diese eigene OpenCPN Version wird immer mit den Plugins
-   zusammen geliefert, die einigermaßen gut funktionieren.
+    e. Except for the above problems, because of the plugins, only the dynamic
+    libraries of Using wxWidgets, the plugin concept has other disadvantages:
+    At runtime, the various locale files from OCPN and connected to the
+    plugins so that similar strings with different translations lead to errors.
 
-Größte Änderung ist jedoch die Verwendung von Clang/LLVM mit Xcode statt
-der Befehlszeilen orientierten Cmake Version.
+    f. The concept desired by the OCPN programmers, the plugins as
+    Compiled stand-alone was again abandoned as it became larger
+    Plugin files and only offers advantages if plugins with different
+    OCPN versions should run. It also becomes more cumbersome to code
+    Keeping track of changes in several places, e.g. with the wxJSON Files.
+    In addition, the new concept of the OpenCPN original for updates from
+    Plugins not adopted because still not mature and very much error-prone.
+    This OpenCPN version is always included with the plugins delivered together
+    that work reasonably well.  The biggest change, however, is the use of
+    Clang / LLVM with Xcode instead of the command line oriented Cmake version.
 
 Compiler:
 Xcode 12.4
@@ -89,33 +84,33 @@ Target: x86_64-apple-darwin19.6.0
 SDK 10.15 Catalina
 Thread model: posix
 
-wxWidgets Direktive:
-Sourcen holen von https://github.com/wxWidgets/wxWidgets.git branch master
-Ich verwende die SourceTree.app für Mac OS X.
+wxWidgets directive:
+Get sources from https://github.com/wxWidgets/wxWidgets.git branch master
+I use the SourceTree.app for Mac OS X.
 
-Im Sourcen-Tree neues Verzeichnis erstellen z.B. "build-cocoa-debug".
-Im Terminal in dies Verzeichnis wechseln und konfigurieren mit:
+Create a new directory in the source tree, e.g. "build-cocoa-debug".
+Change to this directory in the terminal and configure with:
 
-../configure --with-expat=builtin --enable-unicode --enable-shared --enable-debug --disable-compat28 --with-osx-cocoa --with-macosx-sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk --without-liblzma --with-zlib=builtin --with-libpng=builtin --with-libjpeg=builtin --without-libtiff CXXFLAGS=-stdlib=libc++ OBJCXXFLAGS=-stdlib=libc++ LDFLAGS=-stdlib=libc++ CXX=clang++ CC=clang
+../configure --with-expat = builtin --enable-unicode --enable-shared --enable-debug --disable-compat28 --with-osx-cocoa --with-macosx-sdk = / Applications / Xcode .app / Contents / Developer / Platforms / MacOSX.platform / Developer / SDKs / MacOSX.sdk --without-liblzma --with-zlib = builtin --with-libpng = builtin --with-libjpeg = builtin --without- libtiff CXXFLAGS = -stdlib = libc ++ OBJCXXFLAGS = -stdlib = libc ++ LDFLAGS = -stdlib = libc ++ CXX = clang ++ CC = clang
 
-Dann Eingabe von: make
-und schließlich Eingabe von: sudo make install
+Then enter: make
+and finally typing: sudo make install
 
-Die dylibs und Header werden installiert in: /usr/local/Lib/
-bzw. /usr/local/include/wx-3.1
+The dylibs and headers are installed in: / usr / local / Lib /
+or /usr/local/include/wx-3.1
 
-Um eine eigenständige OpenCPN-Version zu erhalten, müssen OpenCPN und die
-dylibs (im Contents/Frameworks/ Verzeichnis bzw. Contents/Plugins/ Verzeichnis)
-mit "install_name_tool -change" bearbeitet werden!
-Siehe batchwx.sh bzw. Xcode Scripts.
+To get a standalone OpenCPN version, OpenCPN and the
+dylibs (in the Contents / Frameworks / directory or Contents / Plugins / directory)
+can be edited with "install_name_tool -change"!
+See batchwx.sh or Xcode Scripts.
 
-wxCurl wurde auf diese Art ebenfalls als dynamische Library compiliert.
+wxCurl was also compiled as a dynamic library in this way.
 
-HINWEIS:
-Große Dateien ( > 100 MB) nimmt GitHub nicht mehr ohne weiteres.
-Die Datei /data/gshhs/poly-f-1.dat mit ~172 MB muß daher separat geholt werden
-und nach /data/gshhs/ kopiert werden:
+NOTE:
+GitHub no longer easily accepts large files (> 100 MB).
+The file /data/gshhs/poly-f-1.dat with ~ 172 MB must therefore be fetched separately
+and copied to / data / gshhs /:
 https://topperdiek.de/dl/ocpn/poly-f-1.dat
------------------------------------------------------------------------
-10. März 2021
+-------------------------------------------------- ---------------------
+March 10, 2021
 
