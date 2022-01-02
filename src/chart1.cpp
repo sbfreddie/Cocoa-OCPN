@@ -335,6 +335,7 @@ bool                      g_bTempShowMenuBar;
 int                       g_iSDMMFormat;
 int                       g_iDistanceFormat;
 int                       g_iSpeedFormat;
+int                       g_iTempFormat;
 
 int                       g_iNavAidRadarRingsNumberVisible;
 float                     g_fNavAidRadarRingsStep;
@@ -729,8 +730,6 @@ double                    g_UserVar;
 bool                      g_bMagneticAPB;
 
 bool                      g_bInlandEcdis;
-
-bool                      g_bDarkDecorations;
 
 //                        OpenGL Globals
 int                       g_GPU_MemSize;
@@ -1615,6 +1614,10 @@ void ParseAllENC(wxWindow* parent)
 bool MyApp::OnInit()
 {
     if( !wxApp::OnInit() ) return false;
+#ifdef __OCPN__ANDROID__
+    androidEnableBackButton( false );
+    androidEnableOptionItems( false );
+#endif
 
     GpxDocument::SeedRandom();
 
@@ -2061,19 +2064,25 @@ bool MyApp::OnInit()
     }
 
     //  Check the global Tide/Current data source array
-    //  If empty, preset one default (US) Ascii data source
-    wxString default_tcdata =  ( g_Platform->GetSharedDataDir() + _T("tcdata") +
-             wxFileName::GetPathSeparator() + _T("HARMONIC.IDX"));
+    //  If empty, preset default (US + ROW) data sources
+    wxString default_tcdata0 =
+        ( g_Platform->GetSharedDataDir() + _T("tcdata") +
+         wxFileName::GetPathSeparator() + _T("harmonics-dwf-20210110-free.tcd"));
+    wxString default_tcdata1 =
+        (g_Platform->GetSharedDataDir() + _T("tcdata") +
+         wxFileName::GetPathSeparator() + _T("HARMONICS_NO_US.IDX"));
     
     if(!TideCurrentDataSet.GetCount()) {
-        TideCurrentDataSet.Add(g_Platform->NormalizePath(default_tcdata) );
+        TideCurrentDataSet.Add(g_Platform->NormalizePath(default_tcdata0));
+        TideCurrentDataSet.Add(g_Platform->NormalizePath(default_tcdata1));
     }
     else {
         wxString first_tide = TideCurrentDataSet[0];
         wxFileName ft(first_tide);
         if(!ft.FileExists()){
             TideCurrentDataSet.RemoveAt(0);
-            TideCurrentDataSet.Insert(g_Platform->NormalizePath(default_tcdata), 0 );
+            TideCurrentDataSet.Insert(g_Platform->NormalizePath(default_tcdata0), 0);
+            TideCurrentDataSet.Add(g_Platform->NormalizePath(default_tcdata1));
         }
     }
 
@@ -2253,8 +2262,10 @@ bool MyApp::OnInit()
 
     if( g_bframemax ) gFrame->Maximize( true );
 
+#ifdef __OCPN__ANDROID__
     if( g_bresponsive  && ( gFrame->GetPrimaryCanvas()->GetPixPerMM() > 4.0))
         gFrame->Maximize( true );
+#endif
 
     //  Yield to pick up the OnSize() calls that result from Maximize()
     Yield();
@@ -2434,10 +2445,6 @@ extern ocpnGLOptions g_GLOptions;
     gFrame->GetPrimaryCanvas()->Enable();
     gFrame->GetPrimaryCanvas()->SetFocus();
 
-#ifdef __WXQT__
-    if(gFrame->GetPrimaryCanvas() && gFrame->GetPrimaryCanvas()->GetToolbar())
-        gFrame->GetPrimaryCanvas()->GetToolbar()->Raise();
-#endif
 
     // Setup Tides/Currents to settings present at last shutdown
 // TODO
@@ -2680,8 +2687,10 @@ END_EVENT_TABLE()
 static void onBellsFinishedCB(void* ptr)
 {
    auto framePtr  = static_cast<MyFrame*>(ptr);
-   wxCommandEvent ev(BELLS_PLAYED_EVTYPE);
-   wxPostEvent(framePtr, ev);
+    if( framePtr){
+     wxCommandEvent ev(BELLS_PLAYED_EVTYPE);
+     wxPostEvent(framePtr, ev);
+    }
 }
 
 
@@ -3001,7 +3010,7 @@ void MyFrame::SetAndApplyColorScheme( ColorScheme cs )
     }
 
 #if defined(__WXOSX__) && defined(OCPN_USE_DARKMODE)
-    bool darkMode = (cs == GLOBAL_COLOR_SCHEME_DUSK || cs == GLOBAL_COLOR_SCHEME_NIGHT || g_bDarkDecorations);
+    bool darkMode = (cs == GLOBAL_COLOR_SCHEME_DUSK || cs == GLOBAL_COLOR_SCHEME_NIGHT);
 
     if (wxPlatformInfo::Get().CheckOSVersion(10, 14)) {
         setAppLevelDarkMode(darkMode);
@@ -3188,12 +3197,6 @@ void MyFrame::CancelAllMouseRoute()
 
 void MyFrame::NotifyChildrenResize()
 {
-//    // ..For each canvas...
-//    for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
-//        ChartCanvas *cc = g_canvasArray.Item(i);
-//         if(cc)
-//             cc->DestroyMuiBar();                // A new one will automatically be recreated.
-//    }
 }
     
 void MyFrame::CreateCanvasLayout( bool b_useStoredSize )
@@ -3372,16 +3375,6 @@ void MyFrame::RequestNewToolbars(bool bforcenew)
     if( b_inCloseWindow ) {
         return;
     }
-
-    // ..For each canvas...
-    if(0){
-        for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
-            ChartCanvas *cc = g_canvasArray.Item(i);
-            if(cc)
-                cc->RequestNewCanvasToolbar( bforcenew );
-        }
-    }
-
 
     BuildiENCToolbar(bforcenew);
     PositionIENCToolbar();
@@ -3687,14 +3680,7 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
 
  // Persist the toolbar locations
  if( g_MainToolbar ) {
-     wxPoint tbp_incanvas = GetPrimaryCanvas()->GetToolbarPosition();
-     g_maintoolbar_x = tbp_incanvas.x;
-     g_maintoolbar_y = tbp_incanvas.y;
-     g_maintoolbar_orient = GetPrimaryCanvas()->GetToolbarOrientation();
-     //g_toolbarConfig = GetPrimaryCanvas()->GetToolbarConfigString();
-     if (g_MainToolbar) {
-         g_MainToolbar->GetScreenPosition(&g_maintoolbar_x, &g_maintoolbar_y);
-     }
+     g_MainToolbar->GetFrameRelativePosition(&g_maintoolbar_x, &g_maintoolbar_y);
     }
 
    if(g_iENCToolbar){
@@ -3961,6 +3947,8 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
     this->Destroy();
     gFrame = NULL;
 
+    wxLogMessage(_T("gFrame destroyed."));
+
 #ifdef __OCPN__ANDROID__
     qDebug() << "Calling OnExit()";
     wxTheApp->OnExit();
@@ -3973,10 +3961,6 @@ void MyFrame::OnMove( wxMoveEvent& event )
     // ..For each canvas...
     for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
         ChartCanvas *cc = g_canvasArray.Item(i);
-        if( cc && cc->GetToolbar()) {
-            cc->GetToolbar()->RePosition();
-            cc->ReloadVP();
-        }
         if(cc)
             cc->SetMUIBarPosition();
     }
@@ -3988,7 +3972,7 @@ void MyFrame::OnMove( wxMoveEvent& event )
 
     //  If global toolbar is shown, reposition it...
     if( g_MainToolbar){
-        g_MainToolbar->RePosition();
+        g_MainToolbar->RestoreRelativePosition(  g_maintoolbar_x, g_maintoolbar_y );
         g_MainToolbar->Realize();
     }
 
@@ -4220,22 +4204,6 @@ void MyFrame::ODoSetSize( void )
 
     SetCanvasSizes( GetClientSize() );
 
-    // ..For each canvas...
-    for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
-        ChartCanvas *cc = g_canvasArray.Item(i);
-        if( cc && cc->GetToolbar()) {
-            wxSize oldSize = cc->GetToolbar()->GetSize();
-            cc->GetToolbar()->RePosition();
-            cc->GetToolbar()->SetGeometry(cc->GetCompass()->IsShown(), cc->GetCompass()->GetRect());
-            cc->GetToolbar()->Realize();
-
-            if( oldSize != cc->GetToolbar()->GetSize() )
-                cc->GetToolbar()->Refresh( false );
-
-            cc->GetToolbar()->RePosition();
-        }
-    }
-
     UpdateGPSCompassStatusBoxes( true );
 
     if( console )
@@ -4260,7 +4228,7 @@ void MyFrame::ODoSetSize( void )
         if((fabs(deltay) > (g_Platform->getDisplaySize().y / 5)))
             g_MainToolbar->Hide();
 #endif
-        g_MainToolbar->RePosition();
+        g_MainToolbar->RestoreRelativePosition(  g_maintoolbar_x, g_maintoolbar_y );
         //g_MainToolbar->SetGeometry(false, wxRect());
         g_MainToolbar->Realize();
         if(szBefore != g_MainToolbar->GetSize())
@@ -4803,7 +4771,7 @@ bool MyFrame::SetGlobalToolbarViz( bool viz )
 #endif
             ToolbarAnimateTimer.Start( 10, wxTIMER_ONE_SHOT );
     }
-    
+
     return viz_now;
 }
 
@@ -4817,7 +4785,10 @@ void MyFrame::ScheduleSettingsDialog()
 
 ChartCanvas *MyFrame::GetFocusCanvas()
 {
-    return g_focusCanvas;
+    if( (g_canvasConfig != 0) && g_focusCanvas )             // multi-canvas?
+        return g_focusCanvas;
+    else
+        return GetPrimaryCanvas();
 }
 
 void MyFrame::OnToolbarAnimateTimer( wxTimerEvent& event )
@@ -5009,7 +4980,7 @@ void MyFrame::ActivateMOB( void )
     mob_label += mob_time.FormatISODate();
 
     RoutePoint *pWP_MOB = new RoutePoint( gLat, gLon, _T ( "mob" ), mob_label, wxEmptyString );
-    pWP_MOB->m_bKeepXRoute = true;
+    pWP_MOB->SetShared( true );
     pWP_MOB->m_bIsolatedMark = true;
     pWP_MOB->SetWaypointArrivalRadius( -1.0 ); // Negative distance is code to signal "Never Arrive"
     pWP_MOB->SetUseSca(false); //Do not use scaled hiding for MOB 
@@ -5914,8 +5885,6 @@ int MyFrame::DoOptionsDialog()
     if(NULL == g_options) {
         g_Platform->ShowBusySpinner();
         g_options = new options( this, -1, _("Options") );
-        //g_options->SetColorScheme(global_color_scheme);
-        //applyDarkAppearanceToWindow(g_options->MacGetTopLevelWindowRef());
 
         g_Platform->HideBusySpinner();
     }
@@ -5993,8 +5962,10 @@ int MyFrame::DoOptionsDialog()
             cc1SizeBefore = g_canvasArray.Item(0)->GetSize();
     }
 
-    //  Capture the full path names of charts currently shown in all canvases
+    //  Capture the full path names and VPScale of charts currently shown in all canvases
     wxArrayString pathArray;
+    double restoreScale[4];
+
     // ..For each canvas...
     for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
         ChartCanvas *cc = g_canvasArray.Item(i);
@@ -6009,6 +5980,7 @@ int MyFrame::DoOptionsDialog()
             }
 
             pathArray.Add(chart_file_name);
+            restoreScale[i] = cc->GetVPScale();
         }                
     }
 
@@ -6136,6 +6108,15 @@ int MyFrame::DoOptionsDialog()
     SetAllToolbarScale();
     RequestNewToolbars();
 
+    //  Rebuild cursors
+    // ..For each canvas...
+    for (unsigned int i = 0; i < g_canvasArray.GetCount(); i++) {
+      ChartCanvas *cc = g_canvasArray.Item(i);
+      if (cc) {
+        cc->RebuildCursors();
+      }
+    }
+
     // Change of master toolbar scale?
     bool b_masterScaleChange = false;
     if(fabs(g_MainToolbar->GetScaleFactor() - g_toolbar_scalefactor) > 0.01f)
@@ -6194,6 +6175,7 @@ int MyFrame::DoOptionsDialog()
 
     // If needed, refresh each canvas,
     // trying to reload the previously displayed chart by name as saved in pathArray
+    // Also, restoring the previous chart VPScale, if possible
     if(b_refresh){
     // ..For each canvas...
         for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
@@ -6203,10 +6185,11 @@ int MyFrame::DoOptionsDialog()
                 if( i < pathArray.GetCount())
                     index_hint = ChartData->FinddbIndex( pathArray.Item(i));
                 cc->canvasChartsRefresh( index_hint );
+                if(index_hint != -1)
+                    cc->SetVPScale( restoreScale[i] );
             }
         }
     }
-
 
 
     g_boptionsactive = false;
@@ -6498,6 +6481,8 @@ void MyFrame::ChartsRefresh( )
     bool b_run = FrameTimer1.IsRunning();
 
     FrameTimer1.Stop();                  // stop other asynchronous activity
+    bool b_runCOGTimer = FrameCOGTimer.IsRunning();
+    FrameCOGTimer.Stop();
 
     // ..For each canvas...
     for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
@@ -6535,7 +6520,8 @@ bool MyFrame::UpdateChartDatabaseInplace( ArrayOfCDI &DirArray, bool b_force, bo
 {
     bool b_run = FrameTimer1.IsRunning();
     FrameTimer1.Stop();                  // stop other asynchronous activity
-
+    bool b_runCOGTimer = FrameCOGTimer.IsRunning();
+        FrameCOGTimer.Stop();
     // ..For each canvas...
     for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
         ChartCanvas *cc = g_canvasArray.Item(i);
@@ -6601,7 +6587,16 @@ bool MyFrame::UpdateChartDatabaseInplace( ArrayOfCDI &DirArray, bool b_force, bo
 
     pConfig->UpdateChartDirs( DirArray );
 
-    if( b_run ) FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
+    // Restart timers, if necessary
+    if( b_run )
+        FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
+    if( b_runCOGTimer ){
+           //    Restart the COG rotation timer, max frequency is 10 hz.
+        int period_ms = 100;
+        if( g_COGAvgSec > 0 )
+            period_ms = g_COGAvgSec * 1000;
+        FrameCOGTimer.Start( period_ms, wxTIMER_CONTINUOUS );
+    }
 
     return true;
 }
@@ -6674,14 +6669,6 @@ void MyFrame::PositionIENCToolbar()
         posn.x = (GetPrimaryCanvas()->GetSize().x - g_iENCToolbar->GetSize().x ) / 2;
         posn.y = 4;
         g_iENCToolbar->Move(GetPrimaryCanvas()->ClientToScreen(posn));
-    }
-    // take care of left docked instrument windows and don't blast the main toolbar on top of them, hinding instruments
-    // this positions the main toolbar directly right of the left docked instruments onto the chart
-    if (g_MainToolbar) {
-      wxPoint posn;
-      posn.x = 2;
-      posn.y = 4;
-      g_MainToolbar->Move(GetPrimaryCanvas()->ClientToScreen(posn));
     }
 }
 
@@ -6962,8 +6949,6 @@ void MyFrame::OnInitTimer(wxTimerEvent& event)
         case 4:
         {
             g_options = new options( this, -1, _("Options") );
-            //g_options->SetColorScheme(global_color_scheme);
-            //applyDarkAppearanceToWindow(g_options->MacGetTopLevelWindowRef());
 
             if( g_MainToolbar )
                 g_MainToolbar->EnableTool( ID_SETTINGS, true );
@@ -7098,7 +7083,7 @@ void MyFrame::CheckToolbarPosition()
         bMaximized = true;
         if(g_MainToolbar){
             g_MainToolbar->SetYAuxOffset(g_MainToolbar->GetToolSize().y * 15 / 10 );
-            g_MainToolbar->RePosition();
+            g_MainToolbar->RestoreRelativePosition( g_maintoolbar_x, g_maintoolbar_y );
             g_MainToolbar->Realize();
         }
         PositionIENCToolbar();
@@ -7108,7 +7093,7 @@ void MyFrame::CheckToolbarPosition()
          if(g_MainToolbar){
             g_MainToolbar->SetYAuxOffset(0);
             g_MainToolbar->SetDockY( -1 );
-            g_MainToolbar->RePosition();
+            g_MainToolbar->RestoreRelativePosition( g_maintoolbar_x, g_maintoolbar_y );
             g_MainToolbar->Realize();
         }
         PositionIENCToolbar();
@@ -9082,7 +9067,10 @@ void MyFrame::PostProcessNMEA( bool pos_valid, bool cog_sog_valid, const wxStrin
     //    but only if NMEA HDT sentence is not being received
 
     if( !g_bHDT_Rx ) {
-        if( !std::isnan(gVar) && !std::isnan(gHdm)) {
+        if( !std::isnan(gHdm)) {
+            //Set gVar if needed from manual entry. gVar will be overwritten if
+            // WMM plugin is available
+            if( std::isnan(gVar) && (g_UserVar != 0.0) ) gVar = g_UserVar;
             gHdt = gHdm + gVar;
             if (gHdt < 0)
                 gHdt += 360.0;
@@ -9377,7 +9365,7 @@ void MyFrame::ActivateAISMOBRoute( AIS_Target_Data *ptarget )
     mob_label += mob_time.FormatISODate();
 
     RoutePoint *pWP_MOB = new RoutePoint( ptarget->Lat, ptarget->Lon, _T ( "mob" ), mob_label, wxEmptyString );
-    pWP_MOB->m_bKeepXRoute = true;
+    pWP_MOB->SetShared( true );
     pWP_MOB->m_bIsolatedMark = true;
     pSelect->AddSelectableRoutePoint( ptarget->Lat, ptarget->Lon, pWP_MOB );
     pConfig->AddNewWayPoint( pWP_MOB, -1 );       // use auto next num
@@ -10103,14 +10091,14 @@ void MyFrame::RequestNewMasterToolbar(bool bforcenew)
         g_MainToolbar->EnableRolloverBitmaps( false );
 
         g_MainToolbar->CreateConfigMenu();
-        g_MainToolbar->MoveDialogInScreenCoords(wxPoint(g_maintoolbar_x, g_maintoolbar_y), wxPoint(0, 0));
+//        g_MainToolbar->MoveDialogInScreenCoords(wxPoint(g_maintoolbar_x, g_maintoolbar_y), wxPoint(0, 0));
         g_bmasterToolbarFull = true;
 
     }
 
     if( g_MainToolbar ) {
         CreateMasterToolbar();
-        g_MainToolbar->RePosition();
+        g_MainToolbar->RestoreRelativePosition( g_maintoolbar_x, g_maintoolbar_y );
         g_MainToolbar->SetColorScheme(global_color_scheme);
         g_MainToolbar->Show(b_reshow && g_bshowToolbar);
     }
@@ -10119,16 +10107,6 @@ void MyFrame::RequestNewMasterToolbar(bool bforcenew)
         g_MainToolbar->SetAutoHide(g_bAutoHideToolbar);
         g_MainToolbar->SetAutoHideTimer(g_nAutoHideToolbar);
     }
-
-    //  We need to move the toolbar for the primary (leftmost) ChartCanvas out of the way...
-    ChartCanvas *cc = g_canvasArray[0];
-    if(cc && cc->GetToolbar()){
-        wxRect masterToolbarRect = g_MainToolbar->GetRect();
-        cc->GetToolbar()->SetULDockPosition(wxPoint(masterToolbarRect.width + 8, -1));
-        cc->RequestNewCanvasToolbar( false );
-     }
-
-
 
 }
 

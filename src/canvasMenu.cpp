@@ -127,7 +127,6 @@ extern bool             g_bBasicMenus;
 extern double           gHdt;
 extern bool             g_FlushNavobjChanges;
 
-
 //    Constants for right click menus
 enum
 {
@@ -168,6 +167,8 @@ enum
     ID_RT_MENU_PROPERTIES,
     ID_RT_MENU_SENDTOGPS,
     ID_RT_MENU_SENDTONEWGPS,
+    ID_RT_MENU_SHOWNAMES,
+    ID_RT_MENU_RESEQUENCE,
     ID_WP_MENU_SET_ANCHORWATCH,
     ID_WP_MENU_CLEAR_ANCHORWATCH,
     ID_DEF_MENU_AISTARGETLIST,
@@ -247,12 +248,12 @@ void MenuPrepend1( wxMenu *menu, int id, wxString label)
 {
     wxMenuItem *item = new wxMenuItem(menu, id, label);
 #if defined(__WXMSW__)
-    wxFont *qFont = GetOCPNScaledFont(_T("Menu"));
+    wxFont *qFont = GetOCPNScaledFont(_("Menu"));
     item->SetFont(*qFont);
 #endif
 
 #ifdef __OCPN__ANDROID__
-    wxFont sFont = GetOCPNGUIScaledFont(_T("Menu"));
+    wxFont sFont = GetOCPNGUIScaledFont(_("Menu"));
     item->SetFont(sFont);
 #endif
 
@@ -269,7 +270,7 @@ void MenuAppend1( wxMenu *menu, int id, wxString label)
 #endif
 
 #ifdef __OCPN__ANDROID__
-    wxFont sFont = GetOCPNGUIScaledFont(_T("Menu"));
+    wxFont sFont = GetOCPNGUIScaledFont(_("Menu"));
     item->SetFont(sFont);
 #endif
 
@@ -300,34 +301,36 @@ void CanvasMenuHandler::CanvasPopupMenu( int x, int y, int seltype )
     popx = x;
     popy = y;
 
-    if( seltype == SELTYPE_ROUTECREATE ) {
-        MenuAppend1( contextMenu, ID_RC_MENU_FINISH, _menuText( _( "End Route" ), _T("Esc") ) );
-    }
-
-    if( ! parent->m_pMouseRoute ) {
-        if( parent->m_bMeasure_Active )
-            MenuPrepend1( contextMenu, ID_DEF_MENU_DEACTIVATE_MEASURE, _menuText( _("Measure Off"), _T("Esc") ) );
-        else
-            MenuPrepend1( contextMenu, ID_DEF_MENU_ACTIVATE_MEASURE, _menuText( _( "Measure" ), _T("M") ) );
-//            contextMenu->Prepend( ID_DEF_MENU_ACTIVATE_MEASURE, _menuText( _( "Measure" ), _T("F4") ) );
-    }
-
     if( !g_bBasicMenus || (seltype != SELTYPE_ROUTECREATE )) {
         if( parent->undo->AnythingToUndo() ) {
             wxString undoItem;
             undoItem << _("Undo") << _T(" ") << parent->undo->GetNextUndoableAction()->Description();
-            MenuPrepend1( contextMenu, ID_UNDO, _menuText( undoItem, _T("Ctrl-Z") ) );
+            MenuAppend1(contextMenu, ID_UNDO, _menuText(undoItem, _T("Ctrl-Z")));
         }
 
         if( parent->undo->AnythingToRedo() ) {
             wxString redoItem;
             redoItem << _("Redo") << _T(" ") << parent->undo->GetNextRedoableAction()->Description();
 #ifdef __WXOSX__
-            MenuPrepend1( contextMenu, ID_REDO, _menuText( redoItem, _T("Shift-Ctrl-Z") ) );
+            MenuAppend1( contextMenu, ID_REDO, _menuText( redoItem, _T("Shift-Ctrl-Z") ) );
 #else
-            MenuPrepend1( contextMenu, ID_REDO, _menuText( redoItem, _T("Ctrl-Y") ) );
+            MenuAppend1( contextMenu, ID_REDO, _menuText( redoItem, _T("Ctrl-Y") ) );
 #endif
         }
+    }
+
+    if (seltype == SELTYPE_ROUTECREATE) {
+      MenuAppend1(contextMenu, ID_RC_MENU_FINISH,
+                  _menuText(_("End Route"), _T("Esc")));
+    }
+
+    if (!parent->m_pMouseRoute) {
+      if (parent->m_bMeasure_Active)
+        MenuAppend1(contextMenu, ID_DEF_MENU_DEACTIVATE_MEASURE,
+                     _menuText(_("Measure Off"), _T("Esc")));
+      else
+        MenuAppend1(contextMenu, ID_DEF_MENU_ACTIVATE_MEASURE,
+                     _menuText(_("Measure"), _T("M")));
     }
 
     bool ais_areanotice = false;
@@ -643,6 +646,13 @@ if( !g_bBasicMenus && (nChartStack > 1 ) ) {
             MenuAppend1( menuRoute, ID_RT_MENU_COPY, _( "Copy as KML" ) + _T( "..." ) );
             MenuAppend1( menuRoute, ID_RT_MENU_DELETE, _( "Delete" ) + _T( "..." ) );
             MenuAppend1( menuRoute, ID_RT_MENU_REVERSE, _( "Reverse..." ) );
+            if( m_pSelectedRoute ){
+                if(m_pSelectedRoute->AreWaypointNamesVisible())
+                    MenuAppend1( menuRoute, ID_RT_MENU_SHOWNAMES, _( "Hide Waypoint Names" ) );
+                else
+                    MenuAppend1( menuRoute, ID_RT_MENU_SHOWNAMES, _( "Show Waypoint Names" ) );
+            }
+            MenuAppend1( menuRoute, ID_RT_MENU_RESEQUENCE, _( "Resequence Waypoints..." ) );
 
             wxString port = parent->FindValidUploadPort();
             parent->m_active_upload_port = port;
@@ -914,7 +924,8 @@ if( !g_bBasicMenus && (nChartStack > 1 ) ) {
                                          pimis->pmenu_item->GetKind(),
                                          submenu );
 #ifdef __WXMSW__
-        pmi->SetFont(pimis->pmenu_item->GetFont());
+        wxFont *qFont = GetOCPNScaledFont(_("Menu"));
+        pmi->SetFont( *qFont);
 #endif
         wxMenu *dst = contextMenu;
         if (pimis->m_in_menu == "Waypoint")
@@ -1064,7 +1075,7 @@ void CanvasMenuHandler::PopupMenuHandler( wxCommandEvent& event )
 
         temp_route->AddPoint( pWP_src );
         temp_route->AddPoint( m_pFoundRoutePoint );
-        m_pFoundRoutePoint->m_bKeepXRoute = true;
+        m_pFoundRoutePoint->SetShared( true );
 
         pSelect->AddSelectableRouteSegment( gLat, gLon, m_pFoundRoutePoint->m_lat,
                                             m_pFoundRoutePoint->m_lon, pWP_src, m_pFoundRoutePoint, temp_route );
@@ -1304,6 +1315,35 @@ void CanvasMenuHandler::PopupMenuHandler( wxCommandEvent& event )
         break;
     }
 
+    case ID_RT_MENU_SHOWNAMES: {
+
+        if( m_pSelectedRoute ){
+            m_pSelectedRoute->ShowWaypointNames( !m_pSelectedRoute->AreWaypointNamesVisible() );
+        }
+
+        break;
+    }
+
+    case ID_RT_MENU_RESEQUENCE: {
+
+        if( m_pSelectedRoute ){
+            if( m_pSelectedRoute->m_bIsInLayer ) break;
+
+            int ask_return = OCPNMessageBox( parent, g_pRouteMan->GetRouteResequenceMessage(),
+                                  _("Rename Waypoints?"), wxYES_NO | wxCANCEL );
+
+            if( ask_return != wxID_CANCEL ) {
+                   m_pSelectedRoute->RenameRoutePoints();
+            }
+
+            gFrame->InvalidateAllGL();
+            gFrame->RefreshAllCanvas();
+
+            }
+
+        break;
+    }
+
     case ID_RT_MENU_DELETE: {
         int dlg_return = wxID_YES;
         if( g_bConfirmObjectDelete ) {
@@ -1364,11 +1404,16 @@ void CanvasMenuHandler::PopupMenuHandler( wxCommandEvent& event )
 
         break;
 
-    case ID_RT_MENU_INSERT:
+    case ID_RT_MENU_INSERT: {
 
         if( m_pSelectedRoute->m_bIsInLayer ) break;
+        bool rename = false;
+        int ask_return = OCPNMessageBox( parent, _("Waypoints can be renamed to include the new one, the names will be '001', '002' etc.")
+                               + _T("\n\n") + _("Do you want to rename the waypoints?"),
+                               _("Rename Waypoints?"), wxYES_NO | wxCANCEL );
+        if( ask_return == wxID_YES ) rename = true;
 
-        m_pSelectedRoute->InsertPointAfter( m_pFoundRoutePoint, zlat, zlon );
+        m_pSelectedRoute->InsertPointAfter( m_pFoundRoutePoint, zlat, zlon, rename );
 
         pSelect->DeleteAllSelectableRoutePoints( m_pSelectedRoute );
         pSelect->DeleteAllSelectableRouteSegments( m_pSelectedRoute );
@@ -1394,6 +1439,7 @@ void CanvasMenuHandler::PopupMenuHandler( wxCommandEvent& event )
         }
 
         break;
+    }
 
     case ID_RT_MENU_APPEND:
 

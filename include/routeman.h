@@ -1,4 +1,4 @@
-/***************************************************************************
+/* **************************************************************************
  *
  * Project:  OpenCPN
  * Purpose:  Route Manager
@@ -80,10 +80,11 @@ public:
       Route *FindRouteByGUID(const wxString &guid);
       Track *FindTrackByGUID(const wxString &guid);
       Route *FindRouteContainingWaypoint(RoutePoint *pWP);
+      Route *FindVisibleRouteContainingWaypoint(RoutePoint *pWP);
       wxArrayPtrVoid *GetRouteArrayContaining(RoutePoint *pWP);
       bool DoesRouteContainSharedPoints( Route *pRoute );
       void RemovePointFromRoute( RoutePoint* point, Route* route, ChartCanvas *cc );
-          
+
       bool ActivateRoute(Route *pRouteToActivate, RoutePoint *pStartPoint = NULL);
       bool ActivateRoutePoint(Route *pA, RoutePoint *pRP);
       bool ActivateNextPoint(Route *pr, bool skipped);
@@ -118,12 +119,13 @@ public:
       wxBrush * GetRoutePointBrush(void){return m_pRoutePointBrush;}
 
       wxString GetRouteReverseMessage(void);
+      wxString GetRouteResequenceMessage(void);
 
       bool        m_bDataValid;
 
 private:
       void DoAdvance(void);
-    
+
       MyApp       *m_pparent_app;
       Route       *pActiveRoute;
       RoutePoint  *pActivePoint;
@@ -153,10 +155,10 @@ private:
       wxBrush     *m_pRoutePointBrush;
 
       NMEA0183    m_NMEA0183;                         // For autopilot output
-      
+
       double      m_arrival_min;
       int         m_arrival_test;
-      
+
 
 };
 
@@ -176,10 +178,12 @@ public:
       int GetIconIndex(const wxBitmap *pbm);
       int GetIconImageListIndex(const wxBitmap *pbm);
       int GetXIconImageListIndex(const wxBitmap *pbm);
+      int GetFIconImageListIndex( const wxBitmap *pbm );
       int GetNumIcons(void){ return m_pIconArray->Count(); }
       wxString CreateGUID(RoutePoint *pRP);
       RoutePoint *GetNearbyWaypoint(double lat, double lon, double radius_meters);
       RoutePoint *GetOtherNearbyWaypoint(double lat, double lon, double radius_meters, const wxString &guid);
+      bool IsReallyVisible(RoutePoint* pWP );
       void SetColorScheme(ColorScheme cs);
       bool SharedWptsExist();
       void DeleteAllWaypoints(bool b_delete_used);
@@ -190,14 +194,15 @@ public:
       void ProcessDefaultIcons();
       void ReloadAllIcons();
       void ReloadRoutepointIcons();
-      
+
       bool DoesIconExist(const wxString & icon_key) const;
       wxBitmap GetIconBitmapForList(int index, int height);
       wxString *GetIconDescription(int index);
       wxString *GetIconKey(int index);
+      wxString GetIconDescription(wxString icon_key);
 
       wxImageList *Getpmarkicon_image_list( int nominal_height );
-      
+
       bool AddRoutePoint(RoutePoint *prp);
       bool RemoveRoutePoint(RoutePoint *prp);
       RoutePointList *GetWaypointList(void) { return m_pWayPointList; }
@@ -208,7 +213,7 @@ private:
       MarkIcon *ProcessExtendedIcon(wxImage &image, const wxString & key, const wxString & description);
       wxRect CropImageOnAlpha(wxImage &image);
       wxImage CreateDimImage( wxImage &image, double factor );
-      
+
       void ProcessUserIcons( ocpnStyle::Style* style );
       RoutePointList    *m_pWayPointList;
       wxBitmap *CreateDimBitmap(wxBitmap *pBitmap, double factor);
@@ -219,10 +224,10 @@ private:
 
       int         m_nGUID;
       double      m_iconListScale;
-      
+
       SortedArrayOfMarkIcon    *m_pLegacyIconArray;
       SortedArrayOfMarkIcon    *m_pExtendedIconArray;
-      
+
       int         m_bitmapSizeForList;
       int         m_iconListHeight;
       ColorScheme m_cs;

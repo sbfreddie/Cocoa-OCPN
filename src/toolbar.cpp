@@ -63,6 +63,8 @@ extern bool                       g_bmasterToolbarFull;
 extern bool                       g_useMUI;
 extern wxString                   g_toolbarConfig;
 extern double                     g_plus_minus_zoom_factor;
+extern int                        g_maintoolbar_x;
+extern int                        g_maintoolbar_y;
 
 class ocpnToolBarTool: public wxToolBarToolBase {
 public:
@@ -483,7 +485,22 @@ void ocpnFloatingToolbarDialog::SetGeometry(bool bAvoid, wxRect rectAvoid)
     }
  }
 
-void ocpnFloatingToolbarDialog::RePosition()
+void ocpnFloatingToolbarDialog::GetFrameRelativePosition( int* x, int *y)
+{
+    wxPoint myPos = GetPosition();
+
+    wxPoint relPos = gFrame->GetPrimaryCanvas()->ScreenToClient(myPos);
+    if (x) *x = relPos.x;
+    if (y) *y = relPos.y;
+}
+
+void ocpnFloatingToolbarDialog::RestoreRelativePosition( int x, int y )
+{
+    wxPoint screenPos = gFrame->GetPrimaryCanvas()->ClientToScreen(wxPoint(x, y));
+    Move(wxPoint(screenPos));
+}
+
+void ocpnFloatingToolbarDialog::SetDefaultPosition()
 {
     if(m_block) return;
 
@@ -540,12 +557,16 @@ void ocpnFloatingToolbarDialog::RePosition()
 
 void ocpnFloatingToolbarDialog::HideTooltip()
 {
+#ifndef __OCPN__ANDROID__
     if( m_ptoolbar ) m_ptoolbar->HideTooltip();
+#endif
 }
 
 void ocpnFloatingToolbarDialog::ShowTooltips()
 {
+#ifndef __OCPN__ANDROID__
     if( m_ptoolbar ) m_ptoolbar->EnableTooltips();
+#endif
 }
 
 void ocpnFloatingToolbarDialog::ToggleOrientation()
@@ -1318,10 +1339,14 @@ ToolTipWin::~ToolTipWin()
 void ToolTipWin::SetColorScheme( ColorScheme cs )
 {
     m_back_color = GetGlobalColor( _T ( "UIBCK" ) );
+    m_text_color = GetGlobalColor(_T ( "UITX1" ));
+
+#ifndef __WXOSX__
     m_text_color = FontMgr::Get().GetFontColor( _("ToolTips") );
     // assume black is the default 
     if (m_text_color == *wxBLACK)
        m_text_color = GetGlobalColor( _T ( "UITX1" ) );
+#endif
 
     m_cs = cs;
 }
@@ -1471,11 +1496,12 @@ void ocpnToolBarSimple::Init()
     m_last_plugin_down_id = -1;
     m_leftDown = false;
     m_nShowTools = 0;
-    
+    m_btooltip_show = false;
+#ifndef __OCPN__ANDROID__
     EnableTooltips();
+#endif
     m_tbenableRolloverBitmaps = false;
-    
- }
+}
 
 wxToolBarToolBase *ocpnToolBarSimple::DoAddTool( int id, const wxString& label,
         const wxBitmap& bitmap, const wxBitmap& bmpDisabled, wxItemKind kind,
@@ -1635,6 +1661,20 @@ ocpnToolBarSimple::~ocpnToolBarSimple()
 
 }
 
+void ocpnToolBarSimple::EnableTooltips()
+{
+#ifndef __OCPN__ANDROID__
+    m_btooltip_show = true;
+#endif
+}
+
+void ocpnToolBarSimple::DisableTooltips()
+{
+#ifndef __OCPN__ANDROID__
+    ocpnToolBarSimple::m_btooltip_show = false;
+#endif
+}
+
 void ocpnToolBarSimple::KillTooltip()
 {
     m_btooltip_show = false;
@@ -1674,18 +1714,21 @@ void ocpnToolBarSimple::KillTooltip()
 
 void ocpnToolBarSimple::HideTooltip()
 {
+#ifndef __OCPN__ANDROID__
     if( m_pToolTipWin ) {
         m_pToolTipWin->Hide();
     }
+#endif
 }
 
 void ocpnToolBarSimple::SetColorScheme( ColorScheme cs )
 {
+#ifndef __OCPN__ANDROID__
     if( m_pToolTipWin ) {
         m_pToolTipWin->Destroy();
         m_pToolTipWin = NULL;
     }
-
+#endif
     m_toolOutlineColour = GetGlobalColor( _T("UIBDR") );
 
     m_currentColorScheme = cs;
@@ -1909,9 +1952,11 @@ void ocpnToolBarSimple::OnToolTipTimerEvent( wxTimerEvent& event )
                 m_pToolTipWin->Show();
 #ifndef __WXOSX__
                 gFrame->Raise();
-#endif                
+#endif
+#ifndef __OCPN__ANDROID__
                 if( g_btouch )
                     m_tooltipoff_timer.Start(m_tooltip_off, wxTIMER_ONE_SHOT);
+#endif
             }
         }
     }
@@ -1939,14 +1984,57 @@ void ocpnToolBarSimple::OnMouseEvent( wxMouseEvent & event )
 
 #ifndef __OCPN__ANDROID__
     if( event.LeftDown() ) {
-///        CaptureMouse();
+//        CaptureMouse();
         s_dragx = x;
         s_dragy = y;
     }
     if( event.LeftUp() ) {
-///        if( HasCapture() ) ReleaseMouse();
+//        if( HasCapture() ) ReleaseMouse();
     }
 #endif
+
+    static wxPoint s_pos_m_old;
+    static bool s_drag;
+
+    if ( tool && (s_drag || tool->GetId() == ID_MASTERTOGGLE)) {
+
+        wxPoint pos_m = ClientToScreen(wxPoint(x, y));
+        if (event.LeftDown()) {
+            s_pos_m_old = pos_m;
+
+        }
+
+        if (!g_btouch && event.Dragging()) {
+            s_drag = true;
+            wxPoint pos_old = GetScreenPosition();
+            wxPoint pos_new = pos_old;
+ 
+            int dx = abs(pos_m.x - s_pos_m_old.x);
+            int dy = abs(pos_m.y - s_pos_m_old.y);
+            if( (dx < 10) && (dy < 10)){
+                //s_pos_m_old = pos_m;
+                //return;
+            }
+
+ 
+            pos_new.x += pos_m.x - s_pos_m_old.x;
+            pos_new.y += pos_m.y - s_pos_m_old.y;
+
+            ocpnFloatingToolbarDialog * parentFloatingToolBar = dynamic_cast<ocpnFloatingToolbarDialog*>(GetParent());
+            //if( (dx > 4) || (dy > 4))
+                parentFloatingToolBar->MoveDialogInScreenCoords(pos_new, pos_old);
+            ocpnFloatingToolbarDialog *parent = wxDynamicCast(GetParent(), ocpnFloatingToolbarDialog);
+            if(parent)
+                parent->GetFrameRelativePosition(&g_maintoolbar_x, &g_maintoolbar_y);
+            s_pos_m_old = pos_m;
+            return;
+        }
+
+        if (event.LeftUp() && s_drag) {
+            s_drag = false;
+            return;
+        }
+    }
 
     if( tool && tool->IsButton() && IsShown() ) {
 
@@ -2045,36 +2133,6 @@ void ocpnToolBarSimple::OnMouseEvent( wxMouseEvent & event )
         wxDELETE( pev );
 
         return;
-    }
-
-    if (tool->GetId() == ID_MASTERTOGGLE) {
-        static wxPoint s_pos_m_old;
-        static bool s_drag;
-        
-        wxPoint pos_m = ClientToScreen(wxPoint(x, y));
-        if (event.LeftDown()) {
-            s_pos_m_old = pos_m;
-            
-        }
-        
-        if (!g_btouch && event.Dragging()) {
-            s_drag = true;
-            wxPoint pos_old = GetScreenPosition();
-            wxPoint pos_new = pos_old;
-            
-            pos_new.x += pos_m.x - s_pos_m_old.x;
-            pos_new.y += pos_m.y - s_pos_m_old.y;
-            
-            ocpnFloatingToolbarDialog * parentFloatingToolBar = dynamic_cast<ocpnFloatingToolbarDialog*>(GetParent());
-            parentFloatingToolBar->MoveDialogInScreenCoords(pos_new, pos_old);
-            s_pos_m_old = pos_m;
-            return;
-        }
-        
-        if (event.LeftUp() && s_drag) {
-            s_drag = false;
-            return;
-        }
     }
 
     if( !event.IsButton() ) {

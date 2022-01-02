@@ -109,7 +109,7 @@ WX_DEFINE_LIST(AISTargetTrackList);
 wxString ais_get_status(int index)
 {
     static const wxString ais_status[] = {
-        _("Underway"),
+        _("Underway using Engine"),
         _("At Anchor"),
         _("Not Under Command"),
         _("Restricted Manoeuvrability"),
@@ -117,7 +117,7 @@ wxString ais_get_status(int index)
         _("Moored"),
         _("Aground"),
         _("Engaged in Fishing"),
-        _("Under way sailing"),
+        _("Underway sailing"),
         _("High Speed Craft"),
         _("Wing In Ground Effect"),
         _("Power-driven vessel towing astern (regional use)"),
@@ -139,11 +139,11 @@ wxString ais_get_status(int index)
 wxString ais_get_type(int index)
 {
 	static const wxString ais_type[] = {
-        _("Vessel Fishing"),             //30        0
-        _("Vessel Towing"),              //31        1
-        _("Vessel Towing, Long"),        //32        2
-        _("Vessel Dredging"),            //33        3
-        _("Vessel Diving"),              //34        4
+        _("Fishing Vessel"),             //30        0
+        _("Towing Vessel"),              //31        1
+        _("Towing Vessel, Long"),        //32        2
+        _("Dredger"),                    //33        3
+        _("Diving Ops Vessel"),              //34        4
         _("Military Vessel"),            //35        5
         _("Sailing Vessel"),             //36        6
         _("Pleasure craft"),             //37        7
@@ -1088,8 +1088,10 @@ static void AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc, ViewPort& vp, ChartC
         }
 
         //   If this is an AIS Class B target, so symbolize it differently
-        if( td->Class == AIS_CLASS_B ) ais_quad_icon[3].y = 0;
-        else if( td->Class == AIS_GPSG_BUDDY ) {
+         if( td->Class == AIS_CLASS_B )
+             ais_quad_icon[3].y = 0;
+
+         if( (td->Class == AIS_GPSG_BUDDY)  || (td->b_isFollower) ){
             ais_quad_icon[0] = wxPoint(-5, -12);
             ais_quad_icon[1] = wxPoint(-3,  12);
             ais_quad_icon[2] = wxPoint( 3,  12);
@@ -1152,6 +1154,9 @@ static void AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc, ViewPort& vp, ChartC
         target_brush = wxBrush( UINFG );
 
     if( ( td->n_alert_state == AIS_ALERT_SET ) && ( td->bCPA_Valid ) )
+        target_brush = wxBrush( URED );
+
+    if( ( td->n_alert_state == AIS_ALERT_NO_DIALOG_SET ) && ( td->bCPA_Valid ) )
         target_brush = wxBrush( URED );
 
     if( td->b_positionDoubtful ) target_brush = wxBrush( GetGlobalColor( _T ( "UINFF" ) ) );
@@ -1303,7 +1308,7 @@ static void AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc, ViewPort& vp, ChartC
 #ifdef ocpnUSE_GL
 
                         glPushMatrix();
-                        glTranslated(pixx1, pixy1, 0);
+                        glTranslated(PredPoint.x, PredPoint.y, 0);
                         glScalef(AIS_scale_factor, AIS_scale_factor, AIS_scale_factor);
                         // draw circle
                         float points[] = {0.0f, 5.0f, 2.5f, 4.330127f, 4.330127f, 2.5f, 5.0f,
@@ -1539,6 +1544,45 @@ static void AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc, ViewPort& vp, ChartC
 
 
 #endif
+
+        }
+            // Draw stroke "inverted v" for GPS Follower
+       if( td->b_isFollower ){
+            wxPoint ais_follow_stroke[3];
+            ais_follow_stroke[0] = wxPoint(-3, -20);
+            ais_follow_stroke[1] = wxPoint(0, 0 );
+            ais_follow_stroke[2] = wxPoint(3, -20);
+
+            transrot_pts(3, ais_follow_stroke, sin_theta, cos_theta);
+
+            if(dc.GetDC()) {
+                dc.SetPen( wxPen( UBLCK, 2 ) );
+                dc.StrokeLine( ais_follow_stroke[0].x + TargetPoint.x, ais_follow_stroke[0].y + TargetPoint.y,
+                               ais_follow_stroke[1].x + TargetPoint.x, ais_follow_stroke[1].y + TargetPoint.y );
+                dc.StrokeLine( ais_follow_stroke[1].x + TargetPoint.x, ais_follow_stroke[1].y + TargetPoint.y,
+                               ais_follow_stroke[2].x + TargetPoint.x, ais_follow_stroke[2].y + TargetPoint.y );
+            } else {
+#ifdef ocpnUSE_GL
+
+                    glPushMatrix();
+                    glTranslated(TargetPoint.x, TargetPoint.y, 0);
+                    glScalef(AIS_scale_factor, AIS_scale_factor, AIS_scale_factor);
+    
+                    glLineWidth(AIS_width_target_outline);
+#ifndef USE_ANDROID_GLES2
+                    glColor3ub(UBLCK.Red(), UBLCK.Green(), UBLCK.Blue());
+
+                    glBegin(GL_LINE_STRIP);
+                    for(int i=0; i<3; i++)
+                        glVertex2i(ais_follow_stroke[i].x, ais_follow_stroke[i].y);
+                    glEnd();
+
+                    glPopMatrix();
+#endif
+
+#endif
+            }
+
         }
 
         if (g_bDrawAISSize && bcan_draw_size){
@@ -1664,7 +1708,7 @@ static void AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc, ViewPort& vp, ChartC
                 ais_flag_icon[2] = wxPoint( (int)-2*targetscale/100, 0);
                 ais_flag_icon[3] = wxPoint( (int)-2*targetscale/100, (int)-6*targetscale/100);
                 transrot_pts(4, ais_flag_icon, sin_theta, cos_theta, TargetPoint);
-                
+
 
                 if(targetscale < 100)
                     penWidth = 1;

@@ -60,7 +60,11 @@ public:
       void AddPoint(RoutePoint *pNewPoint,
                     bool b_rename_in_sequence = true,
                     bool b_deferBoxCalc = false);
-
+      void InsertPointAndSegment(RoutePoint *pNewPoint, int insert_after,
+                                   bool b_rename_in_sequence = true,
+                                   bool b_deferBoxCalc = false);
+      void AddPointAndSegment(RoutePoint *pNewPoint, bool b_rename_in_sequence = true,
+                                bool b_deferBoxCalc = false);
       RoutePoint *GetPoint(int nPoint);
       RoutePoint *GetPoint ( const wxString &guid );
       int GetIndexOf(RoutePoint *prp);
@@ -116,6 +120,8 @@ public:
       wxString GetName() const { return m_RouteNameString; }
       wxString GetTo() const { return m_RouteEndString; }
       wxString GetGUID() const { return m_GUID; }
+      void ShowWaypointNames( bool bshow );
+      bool AreWaypointNamesVisible( );
 
       int         m_ConfigRouteNum;
       bool        m_bRtIsSelected;

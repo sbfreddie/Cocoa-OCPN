@@ -156,6 +156,7 @@ extern int              g_nTrackPrecision;
 extern int              g_iSDMMFormat;
 extern int              g_iDistanceFormat;
 extern int              g_iSpeedFormat;
+extern int              g_iTempFormat;
 
 extern int              g_nframewin_x;
 extern int              g_nframewin_y;
@@ -435,7 +436,6 @@ extern bool             g_useMUI;
 
 int                     g_nCPUCount;
 
-extern bool             g_bDarkDecorations;
 extern unsigned int     g_canvasConfig;
 extern arrayofCanvasConfigPtr g_canvasConfigArray;
 extern wxString         g_lastAppliedTemplateGUID;
@@ -443,8 +443,12 @@ extern wxString         g_lastAppliedTemplateGUID;
 extern int              g_route_prop_x, g_route_prop_y;
 extern int              g_route_prop_sx, g_route_prop_sy;
 
+extern wxString g_ObjQFileExt;
+
 wxString                g_gpx_path;
 bool                    g_bLayersLoaded;
+
+int g_trackFilterMax;
 
 #ifdef ocpnUSE_GL
 extern ocpnGLOptions g_GLOptions;
@@ -666,6 +670,7 @@ int MyConfig::LoadMyConfig()
 
     g_nAWDefault = 50;
     g_nAWMax = 1852;
+    g_ObjQFileExt = _T("txt,rtf,png,html,gif,tif");
 
     // Load the raw value, with no defaults, and no processing
     int ret_Val = LoadMyConfigRaw();
@@ -770,8 +775,6 @@ int MyConfig::LoadMyConfigRaw( bool bAsTemplate )
 
     Read( _T ( "InlandEcdis" ), &g_bInlandEcdis );// First read if in iENC mode as this will override some config settings
 
-    Read( _T ("DarkDecorations" ), &g_bDarkDecorations );
-
     Read( _T( "SpaceDropMark" ), &g_bSpaceDropMark );
 
     int mem_limit = 0;
@@ -829,6 +832,7 @@ int MyConfig::LoadMyConfigRaw( bool bAsTemplate )
     Read( _T ( "ChartObjectScaleFactor" ), &g_ChartScaleFactor );
     Read( _T ( "ShipScaleFactor" ), &g_ShipScaleFactor );
     Read( _T ( "ENCSoundingScaleFactor" ), &g_ENCSoundingScaleFactor );
+    Read( _T ( "ObjQueryAppendFilesExt" ),  &g_ObjQFileExt);
 
     //  NMEA connection options.
     if( !bAsTemplate ){
@@ -838,6 +842,9 @@ int MyConfig::LoadMyConfigRaw( bool bAsTemplate )
         Read( _T ( "UseGarminHostUpload" ),  &g_bGarminHostUpload );
         Read( _T ( "UseNMEA_GLL" ), &g_bUseGLL );
         Read( _T ( "UseMagAPB" ), &g_bMagneticAPB );
+//        Read(_T ( "TrackContinuous" ), &g_btrackContinuous, false);  // NEU? Checken!!!
+        Read(_T ( "FilterTrackDropLargeJump" ), &g_trackFilterMax, 0);
+
     }
 
     Read( _T ( "ShowTrue" ), &g_bShowTrue );
@@ -950,6 +957,7 @@ int MyConfig::LoadMyConfigRaw( bool bAsTemplate )
 
     Read( _T ( "DistanceFormat" ), &g_iDistanceFormat ); //0 = "Nautical miles"), 1 = "Statute miles", 2 = "Kilometers", 3 = "Meters"
     Read( _T ( "SpeedFormat" ), &g_iSpeedFormat ); //0 = "kts"), 1 = "mph", 2 = "km/h", 3 = "m/s"
+    Read( _T ("TemperatureFormat"), &g_iTempFormat ); //0 = C, 1 = F, 2 = K
 
     // LIVE ETA OPTION
     Read( _T ( "LiveETA" ), &g_bShowLiveETA );
@@ -2132,7 +2140,7 @@ void MyConfig::LoadConfigCanvas( canvasConfig *cConfig, bool bApplyAsTemplate )
     Read( _T ( "canvasENCShowLightDescriptions" ), &cConfig->bShowENCLightDescriptions, 1 );
     Read( _T ( "canvasENCShowLights" ), &cConfig->bShowENCLights, 1 );
     Read( _T ( "canvasENCShowVisibleSectorLights" ), &cConfig->bShowENCVisibleSectorLights, 0 );
-
+    Read(_T ( "canvasENCShowAnchorInfo" ), &cConfig->bShowENCAnchorInfo, 0);
 
     int sx, sy;
     Read( _T ( "canvasSizeX" ), &sx, 0 );
@@ -2242,6 +2250,7 @@ void MyConfig::SaveConfigCanvas( canvasConfig *cConfig )
         Write( _T ( "canvasENCShowLightDescriptions" ), cConfig->canvas->GetShowENCLightDesc() );
         Write( _T ( "canvasENCShowLights" ), cConfig->canvas->GetShowENCLights() );
         Write( _T ( "canvasENCShowVisibleSectorLights" ), cConfig->canvas->GetShowVisibleSectors() );
+        Write(_T ( "canvasENCShowAnchorInfo" ), cConfig->canvas->GetShowENCAnchor());
 
         Write( _T ( "canvasCourseUp" ), cConfig->canvas->GetUpMode() == COURSE_UP_MODE );
         Write( _T ( "canvasHeadUp" ), cConfig->canvas->GetUpMode() == HEAD_UP_MODE );
@@ -2286,8 +2295,6 @@ void MyConfig::UpdateSettings()
     Write( _T ( "NavMessageShown" ), n_NavMessageShown );
     Write( _T ( "InlandEcdis" ), g_bInlandEcdis );
 
-    Write( _T ( "DarkDecorations"), g_bDarkDecorations );
-
     Write( _T ( "UIexpert" ), g_bUIexpert );
     Write( _T( "SpaceDropMark" ), g_bSpaceDropMark );
 //    Write( _T ( "UIStyle" ), g_StyleManager->GetStyleNextInvocation() );      //Not desired for O5 MUI
@@ -2320,6 +2327,7 @@ void MyConfig::UpdateSettings()
     Write( _T ( "ChartObjectScaleFactor" ), g_ChartScaleFactor );
     Write( _T ( "ShipScaleFactor" ), g_ShipScaleFactor );
     Write( _T ( "ENCSoundingScaleFactor" ), g_ENCSoundingScaleFactor );
+    Write(_T ( "ObjQueryAppendFilesExt" ), g_ObjQFileExt);
 
     Write( _T ( "FilterNMEA_Avg" ), g_bfilter_cogsog );
     Write( _T ( "FilterNMEA_Sec" ), g_COGFilterSec );
@@ -2419,6 +2427,7 @@ void MyConfig::UpdateSettings()
         Write( _T ( "DistanceFormat" ), g_iDistanceFormat );
         Write( _T ( "SpeedFormat" ), g_iSpeedFormat );
         Write( _T ( "ShowDepthUnits" ), g_bShowDepthUnits );
+        Write( _T ( "TemperatureFormat" ), g_iTempFormat );
     }
     Write( _T ( "GPSIdent" ), g_GPS_Ident );
     Write( _T ( "UseGarminHostUpload" ), g_bGarminHostUpload );
@@ -2917,7 +2926,7 @@ void ExportGPX( wxWindow* parent, bool bviz_only, bool blayer )
             if( pr->m_bIsInLayer && !blayer )
                 b_add = false;
             if( b_add) {
-                if( pr->m_bKeepXRoute || !WptIsInRouteList( pr ) )
+                if( pr->IsShared() || !WptIsInRouteList( pr ) )
                     pgpx->AddGPXWaypoint( pr);
             }
 
@@ -4353,6 +4362,74 @@ wxString getUsrSpeedUnit( int unit )
     return ret;
 }
 
+/* *************************************************************************/
+/*    Converts the temperature to the units selected by user              */
+/* *************************************************************************/
+double toUsrTemp(double cel_temp, int unit)
+{
+    double ret = NAN;
+    if (unit == -1)
+        unit = g_iTempFormat;
+    switch (unit)
+    {
+    case TEMPERATURE_C: //Celsius
+        ret = cel_temp;
+        break;
+    case TEMPERATURE_F: //Fahrenheit
+        ret = (cel_temp * 9.0 / 5.0)  + 32;
+        break;
+    case TEMPERATURE_K:
+        ret = cel_temp + 273.15;
+        break;
+    }
+    return ret;
+}
+
+/* *************************************************************************/
+/*  Converts the temperature from the units selected by user to Celsius   */
+/* *************************************************************************/
+double fromUsrTemp(double usr_temp, int unit)
+{
+    double ret = NAN;
+    if (unit == -1)
+        unit = g_iTempFormat;
+    switch (unit)
+    {
+    case TEMPERATURE_C: //C
+        ret = usr_temp;
+        break;
+    case TEMPERATURE_F: //F
+        ret = (usr_temp - 32) * 5.0 / 9.0;
+        break;
+    case TEMPERATURE_K: //K
+        ret = usr_temp - 273.15;
+        break;
+    }
+    return ret;
+}
+
+/* *************************************************************************/
+/*          Returns the abbreviation of user selected temperature unit          */
+/* *************************************************************************/
+wxString getUsrTempUnit(int unit)
+{
+    wxString ret;
+    if (unit == -1)
+        unit = g_iTempFormat;
+    switch (unit){
+    case TEMPERATURE_C: //Celsius
+        ret = _("C");
+        break;
+    case TEMPERATURE_F: //Fahrenheit
+        ret = _("F");
+        break;
+    case TEMPERATURE_K: //Kelvin
+        ret = _("K");
+        break;
+    }
+    return ret;
+}
+
 wxString formatTimeDelta(wxTimeSpan span)
 {
     wxString timeStr;
@@ -4802,6 +4879,8 @@ void DimeControl( wxWindow* ctrl, wxColour col, wxColour window_back_color, wxCo
         }
 
         ctrl->SetBackgroundColour( window_back_color );
+        if(darkMode)
+            ctrl->SetForegroundColour( text_color );
 
 #if defined(__WXOSX__) && defined(OCPN_USE_DARKMODE)
         // On macOS 10.12, enable dark mode at the window level if appropriate.

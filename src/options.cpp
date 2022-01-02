@@ -48,6 +48,8 @@
 #include <wx/mediactrl.h>
 #include "wx/dir.h"
 #include <wx/statline.h>
+#include <wx/regex.h>
+// #include "SignalKDataStream.h"  // Nicht verwendet
 
 #if wxCHECK_VERSION(2, 9, \
                     4) /* does this work in 2.8 too.. do we need a test? */
@@ -96,10 +98,6 @@ extern GLuint g_raster_format;
 
 #ifdef __OCPN__ANDROID__
 #include "androidUTIL.h"
-#endif
-
-#ifdef __WXOSX__
-#include "DarkMode.h"
 #endif
 
 #include "OCPNPlatform.h"
@@ -232,6 +230,7 @@ extern wxColour g_colourTrackLineColour;
 extern int g_iSDMMFormat;
 extern int g_iDistanceFormat;
 extern int g_iSpeedFormat;
+extern int g_iTempFormat;
 
 extern bool g_bAdvanceRouteWaypointOnArrivalOnly;
 
@@ -324,7 +323,6 @@ extern int g_ENCSoundingScaleFactor;
 extern double g_config_display_size_mm;
 extern bool g_config_display_size_manual;
 extern bool g_bInlandEcdis;
-extern bool g_bDarkDecorations;
 extern unsigned int g_canvasConfig;
 extern bool g_useMUI;
 extern wxString g_lastAppliedTemplateGUID;
@@ -1451,6 +1449,7 @@ wxScrolledWindow* options::AddPage(size_t parent, const wxString& title) {
     /* Only remove the tab from listbook, we still have original content in
      * {page} */
     m_pListbook->InsertPage(parent, nb, toptitle, FALSE, parent);
+    m_pListbook->SetSelection( 0 );   // avoid gtk assertions
     m_pListbook->RemovePage(parent + 1);
     wxString previoustitle = page->GetName();
     page->Reparent(nb);
@@ -1471,6 +1470,7 @@ wxScrolledWindow* options::AddPage(size_t parent, const wxString& title) {
     sw->SetScrollRate(m_scrollRate, m_scrollRate);
     wxString toptitle = m_pListbook->GetPageText(parent);
     m_pListbook->InsertPage(parent, sw, toptitle, FALSE, parent);
+    m_pListbook->SetSelection( 0 );   // avoid gtk assertions
     m_pListbook->DeletePage(parent + 1);
   }
 
@@ -2792,9 +2792,9 @@ void options::CreatePanel_NMEA(size_t parent, int border_size,
 #endif
   FillSourceList();
 
-  ShowNMEACommon(FALSE);
-  ShowNMEASerial(FALSE);
-  ShowNMEANet(FALSE);
+  ShowNMEACommon(true);
+  ShowNMEASerial(true);
+  ShowNMEANet(true);
   connectionsaved = TRUE;
 }
 
@@ -4888,6 +4888,8 @@ void options::CreatePanel_Units(size_t parent, int border_size,
     // another sizer instead of letting it grow.
     wxBoxSizer* wrapperSizer = new wxBoxSizer(wxVERTICAL);
     panelUnits->SetSizer(wrapperSizer);
+
+    wrapperSizer->Add(1, border_size * 24);  // ???
     wrapperSizer->Add(unitsSizer, 1, wxALL | wxALIGN_CENTER, border_size);
 
     // spacer
@@ -4898,11 +4900,14 @@ void options::CreatePanel_Units(size_t parent, int border_size,
     unitsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _("Distance")),
                     labelFlags);
     wxString pDistanceFormats[] = {_("Nautical miles"), _("Statute miles"),
-                                   _("Kilometers"), _("Meters")};
+                                    _("Kilometers"), _("Meters")};
     int m_DistanceFormatsNChoices = sizeof(pDistanceFormats) / sizeof(wxString);
     pDistanceFormat = new wxChoice(panelUnits, ID_DISTANCEUNITSCHOICE,
                                    wxDefaultPosition, wxSize(250, -1),
                                    m_DistanceFormatsNChoices, pDistanceFormats);
+#ifdef __OCPN__ANDROID__
+    setChoiceStyleSheet( pDistanceFormat, m_fontHeight *8/10);
+#endif
     unitsSizer->Add(pDistanceFormat, inputFlags);
 
     // speed units
@@ -4913,6 +4918,9 @@ void options::CreatePanel_Units(size_t parent, int border_size,
     pSpeedFormat =
         new wxChoice(panelUnits, ID_SPEEDUNITSCHOICE, wxDefaultPosition,
                      wxSize(250, -1), m_SpeedFormatsNChoices, pSpeedFormats);
+#ifdef __OCPN__ANDROID__
+    setChoiceStyleSheet( pSpeedFormat, m_fontHeight *8/10);
+#endif
     unitsSizer->Add(pSpeedFormat, inputFlags);
 
     // depth units
@@ -4924,7 +4932,24 @@ void options::CreatePanel_Units(size_t parent, int border_size,
     pDepthUnitSelect =
         new wxChoice(panelUnits, ID_DEPTHUNITSCHOICE, wxDefaultPosition,
                      wxSize(250, -1), 3, pDepthUnitStrings);
+#ifdef __OCPN__ANDROID__
+        setChoiceStyleSheet( pDepthUnitSelect, m_fontHeight *8/10);
+#endif
     unitsSizer->Add(pDepthUnitSelect, inputFlags);
+
+    // temperature units
+    unitsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _("Temperature")),
+                      labelFlags);
+    wxString pTempUnitStrings[] = {
+          _("Celsius"), _("Fahrenheit"), _("Kelvin"),
+    };
+    pTempFormat =
+        new wxChoice(panelUnits, ID_TEMPUNITSCHOICE, wxDefaultPosition,
+                       wxSize(m_fontHeight * 4, -1), 3, pTempUnitStrings);
+#ifdef __OCPN__ANDROID__
+        setChoiceStyleSheet( pTempFormat, m_fontHeight *8/10);
+#endif
+    unitsSizer->Add(pTempFormat, inputFlags);
 
     // spacer
     unitsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _T("")));
@@ -4940,6 +4965,9 @@ void options::CreatePanel_Units(size_t parent, int border_size,
     pSDMMFormat =
         new wxChoice(panelUnits, ID_SDMMFORMATCHOICE, wxDefaultPosition,
                      wxSize(350, -1), m_SDMMFormatsNChoices, pSDMMFormats);
+#ifdef __OCPN__ANDROID__
+        setChoiceStyleSheet( pSDMMFormat, m_fontHeight *8/10);
+#endif
     unitsSizer->Add(pSDMMFormat, inputFlags);
 
     // spacer
@@ -4954,12 +4982,22 @@ void options::CreatePanel_Units(size_t parent, int border_size,
     pCBTrueShow =
         new wxCheckBox(panelUnits, ID_TRUESHOWCHECKBOX, _("Show true"));
     unitsSizer->Add(pCBTrueShow, 0, wxALL, group_item_spacing);
+
+      unitsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _T("")));  // ???
     pCBMagShow =
         new wxCheckBox(panelUnits, ID_MAGSHOWCHECKBOX, _("Show magnetic bearings and headings"));
     unitsSizer->Add(pCBMagShow, 0, wxALL, group_item_spacing);
+    unitsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _T("")));  // ???
 
     //  Mag Heading user variation
 
+    wxStaticBox* itemStaticBoxVar = new wxStaticBox(panelUnits, wxID_ANY, _T(""));
+
+    wxStaticBoxSizer* itemStaticBoxSizerVar = new wxStaticBoxSizer(itemStaticBoxVar, wxVERTICAL);
+    wrapperSizer->Add(itemStaticBoxSizerVar, 0, wxALL | wxEXPAND, 5);
+
+    itemStaticBoxSizerVar->Add(0, border_size * 4);
+/*
     wxStaticBox* itemStaticBoxVar =
         new wxStaticBox(panelUnits, wxID_ANY, _("Assumed magnetic variation"));
     wxStaticBoxSizer* itemStaticBoxSizerVar =
@@ -4972,6 +5010,10 @@ void options::CreatePanel_Units(size_t parent, int border_size,
     //        panelUnits, wxID_ANY, _("Assumed magnetic variation") );
     //       wrapperSizer->Add( itemStaticTextUserVar, 1, wxEXPAND | wxALL |
     //       wxALIGN_CENTRE_VERTICAL, group_item_spacing );
+*/
+
+    itemStaticTextUserVar = new wxStaticText(panelUnits, wxID_ANY, _("Assumed magnetic variation") );
+    itemStaticBoxSizerVar->Add(itemStaticTextUserVar, 1, wxEXPAND | wxALL, group_item_spacing);
 
     wxBoxSizer* magVarSizer = new wxBoxSizer(wxHORIZONTAL);
     itemStaticBoxSizerVar->Add(magVarSizer, 1, wxEXPAND | wxALL,
@@ -5033,6 +5075,17 @@ void options::CreatePanel_Units(size_t parent, int border_size,
         new wxChoice(panelUnits, ID_DEPTHUNITSCHOICE, wxDefaultPosition,
                      wxDefaultSize, 3, pDepthUnitStrings);
     unitsSizer->Add(pDepthUnitSelect, inputFlags);
+
+    // temperature units
+    unitsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _("Temperature")),
+                      labelFlags);
+    wxString pTempUnitStrings[] = {
+          _("Celsius"), _("Fahrenheit"), _("Kelvin"),
+    };
+    pTempFormat =
+          new wxChoice(panelUnits, ID_TEMPUNITSCHOICE, wxDefaultPosition,
+                       wxDefaultSize, 3, pTempUnitStrings);
+    unitsSizer->Add(pTempFormat, inputFlags);
 
     // spacer
     unitsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _T("")));
@@ -5257,7 +5310,8 @@ void options::CreatePanel_Sounds(size_t parent, int border_size,
 #ifdef __WXOSX__
       m_anchorAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_anchorwatch_sound_file) );
 #else
-    m_anchorAudioFileNameText->SetLabel( _(" Audio file name: " + g_anchorwatch_sound_file) );
+      m_anchorAudioFileNameText->SetLabel( " " + _("Audio file name:") + " " +
+                  g_anchorwatch_sound_file);
 #endif
     StaticBoxSizer1->Add(m_anchorAudioFileNameText, 0, wxLEFT, border_size);
 
@@ -5291,7 +5345,8 @@ void options::CreatePanel_Sounds(size_t parent, int border_size,
 #ifdef __WXOSX__
       m_aisAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_AIS_sound_file) );
 #else
-    m_aisAudioFileNameText->SetLabel( _(" Audio file name: " + g_AIS_sound_file) );
+      m_aisAudioFileNameText->SetLabel(" " + _("Audio file name:") + " " +
+              g_AIS_sound_file);
 #endif
     StaticBoxSizer2->Add(m_aisAudioFileNameText, 0, wxLEFT, border_size);
 
@@ -5322,7 +5377,8 @@ void options::CreatePanel_Sounds(size_t parent, int border_size,
 #ifdef __WXOSX__
       m_sartAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_SART_sound_file) );
 #else
-    m_sartAudioFileNameText->SetLabel( _(" Audio file name: " + g_SART_sound_file) );
+      m_sartAudioFileNameText->SetLabel(" " + _("Audio file name:") + " " +
+              g_SART_sound_file);
 #endif
     StaticBoxSizer3->Add(m_sartAudioFileNameText, 0, wxLEFT, border_size);
 
@@ -5353,7 +5409,8 @@ void options::CreatePanel_Sounds(size_t parent, int border_size,
 #ifdef __WXOSX__
       m_dscAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_DSC_sound_file) );
 #else
-    m_dscAudioFileNameText->SetLabel( _(" Audio file name: " + g_DSC_sound_file) );
+      m_dscAudioFileNameText->SetLabel(" " + _("Audio file name:") + " " +
+              g_DSC_sound_file);
 #endif
     StaticBoxSizer4->Add(m_dscAudioFileNameText, 0, wxLEFT, border_size);
 
@@ -5913,14 +5970,6 @@ void options::CreatePanel_UI(size_t parent, int border_size, int group_item_spac
   pInlandEcdis = new wxCheckBox(itemPanelFont, ID_INLANDECDISBOX,
                                 _("Use Settings for Inland ECDIS Version 2.3"));
   miscOptions->Add(pInlandEcdis, 0, wxALL, border_size);
-
-#ifdef __WXOSX__
-  pDarkDecorations = new wxCheckBox(itemPanelFont, ID_DARKDECORATIONSBOX,
-                                  _("Use dark window decorations"));
-  miscOptions->Add(pDarkDecorations, 0, wxALL, border_size);
-  pDarkDecorations->Enable( (osMajor >= 10) && (osMinor >= 12) );
- 
-#endif
 
   miscOptions->AddSpacer(10);
 
@@ -6506,9 +6555,6 @@ void options::SetInitialSettings(void) {
   //pOverzoomEmphasis->SetValue(!g_fog_overzoom);
   //pOZScaleVector->SetValue(!g_oz_vector_scale);
   pInlandEcdis->SetValue(g_bInlandEcdis);
-#ifdef __WXOSX__
-  pDarkDecorations->SetValue(g_bDarkDecorations);
-#endif
   pOpenGL->SetValue(g_bopengl);
   if(pSmoothPanZoom) pSmoothPanZoom->SetValue(g_bsmoothpanzoom);
   pCBTrueShow->SetValue(g_bShowTrue);
@@ -7751,8 +7797,10 @@ void options::OnApplyClick(wxCommandEvent& event) {
   g_bShowMag = pCBMagShow->GetValue();
   
   b_haveWMM = g_pi_manager && g_pi_manager->IsPlugInAvailable(_T("WMM"));
-  if(!b_haveWMM  && !b_oldhaveWMM)
+    if(!b_haveWMM  && !b_oldhaveWMM){
     pMagVar->GetValue().ToDouble(&g_UserVar);
+        gVar = g_UserVar;
+      }
 
   m_pText_OSCOG_Predictor->GetValue().ToDouble(&g_ownship_predictor_minutes);
   m_pText_OSHDT_Predictor->GetValue().ToDouble(&g_ownship_HDTpredictor_miles);
@@ -7941,8 +7989,7 @@ void options::OnApplyClick(wxCommandEvent& event) {
     }
     assert(itemIndex >= 0);
     OBJLElement* pOLE = (OBJLElement*)(ps52plib->pOBJLArray->Item(itemIndex));
-    if(pOLE->nViz != ps57CtlListBox->IsChecked(iPtr))
-        bUserStdChange = true;
+      if (pOLE->nViz != (int)(ps57CtlListBox->IsChecked(iPtr))) bUserStdChange = true;
     pOLE->nViz = ps57CtlListBox->IsChecked(iPtr);
   }
 
@@ -8072,15 +8119,6 @@ void options::OnApplyClick(wxCommandEvent& event) {
         SwitchInlandEcdisMode( g_bInlandEcdis );
         m_returnChanges |= TOOLBAR_CHANGED;    
     }
-#ifdef __WXOSX__
-    if ( g_bDarkDecorations != pDarkDecorations->GetValue() ) {
-        g_bDarkDecorations = pDarkDecorations->GetValue();
-
-        OCPNMessageBox(this,
-                       _("The changes to the window decorations will take full effect the next time you start OpenCPN."),
-                       _("OpenCPN"));
-    }
-#endif
   // PlugIn Manager Panel
 
   // Pick up any changes to selections
@@ -8730,6 +8768,8 @@ void options::DoOnPageChange(size_t page) {
   }
 
   else if (m_pageUI == i) {  // 5 is the index of "User Interface" page
+      if(!m_itemLangListBox)
+        return;
 #if wxUSE_XLOCALE || !wxCHECK_VERSION(3, 0, 0)
 
     if (!m_bVisitLang) {
@@ -8795,7 +8835,8 @@ void options::DoOnPageChange(size_t page) {
             wxString s0 =
                 wxLocale::GetLanguageInfo(lang_list[it])->CanonicalName;
             wxString sl = wxLocale::GetLanguageName(lang_list[it]);
-            if (wxNOT_FOUND == lang_array.Index(s0)) lang_array.Add(s0);
+              if (wxNOT_FOUND == lang_array.Index(s0))
+                lang_array.Add(s0);
           }
         }
       }
@@ -8967,7 +9008,8 @@ void options::OnButtonSelectAnchorSound(wxCommandEvent& event) {
 #ifdef __WXOSX__
       m_anchorAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_anchorwatch_sound_file) );
 #else
-    m_anchorAudioFileNameText->SetLabel( _(" Audio file name: " + g_anchorwatch_sound_file) );
+      m_anchorAudioFileNameText->SetLabel(" " + _("Audio file name:") + " " +
+          g_anchorwatch_sound_file);
 #endif
     g_anchorwatch_sound->Stop();
   }
@@ -8995,7 +9037,8 @@ void options::OnButtonSelectDSCSound(wxCommandEvent& event) {
 #ifdef __WXOSX__
       m_dscAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_DSC_sound_file) );
 #else
-    m_dscAudioFileNameText->SetLabel( _(" Audio file name: " + g_DSC_sound_file) );
+      m_dscAudioFileNameText->SetLabel(" " + _("Audio file name:") + " " +
+          g_DSC_sound_file);
 #endif
   }
 }
@@ -9021,7 +9064,8 @@ void options::OnButtonSelectSARTSound(wxCommandEvent& event) {
 #ifdef __WXOSX__
       m_sartAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_SART_sound_file) );
 #else
-    m_sartAudioFileNameText->SetLabel( _(" Audio file name: " + g_SART_sound_file) );
+      m_sartAudioFileNameText->SetLabel(" " + _("Audio file name:") + " " +
+          g_SART_sound_file);
 #endif
   }
 }
@@ -9047,7 +9091,8 @@ void options::OnButtonSelectAISSound(wxCommandEvent& event) {
 #ifdef __WXOSX__
       m_aisAudioFileNameText->SetLabel( _(" Ton-Dateiname: " + g_AIS_sound_file) );
 #else
-    m_aisAudioFileNameText->SetLabel( _(" Audio file name: " + g_AIS_sound_file) );
+      m_aisAudioFileNameText->SetLabel(" " + _("Audio file name:") + " " +
+          g_AIS_sound_file);
 #endif
   }
 }
@@ -9323,7 +9368,10 @@ void ChartGroupsUI::PopulateTreeCtrl(wxTreeCtrl* ptc,
       // wxWidgets bug workaraound (Ticket #10085)
       ptc->SetItemText(id, dirname);
       if (pFont) ptc->SetItemFont(id, *pFont);
+        // On MacOS, use the default system dialog color, to honor Dark mode.
+#ifndef __WXOSX__
       ptc->SetItemTextColour(id, col);
+#endif
       ptc->SetItemHasChildren(id);
     }
   }
@@ -10060,8 +10108,10 @@ void options::SetConnectionParams(ConnectionParams* cp) {
 }
 
 void options::SetDefaultConnectionParams(void) {
-  m_comboPort->Select(0);
-  m_comboPort->SetValue(wxEmptyString);
+  if (m_comboPort && !m_comboPort->IsListEmpty()){
+      m_comboPort->Select(0);
+      m_comboPort->SetValue(wxEmptyString);  // These two broke it
+  }
   m_cbCheckCRC->SetValue(TRUE);
   m_cbGarminHost->SetValue(FALSE);
   m_cbInput->SetValue(TRUE);
@@ -10084,15 +10134,29 @@ void options::SetDefaultConnectionParams(void) {
   if (!g_bserial_access_checked) bserial = FALSE;
 #endif
 
+#ifdef __WXOSX__
+  bserial = FALSE;
+#endif
+
+#ifdef __OCPN__ANDROID__
+  if (m_rbTypeInternalGPS) {
+    m_rbTypeInternalGPS->SetValue(true);
+    SetNMEAFormToGPS();
+  } else {
+    m_rbTypeNet->SetValue(true);
+    SetNMEAFormToNet();
+  }
+
+#else
   m_rbTypeSerial->SetValue(bserial);
   m_rbTypeNet->SetValue(!bserial);
-
   bserial ? SetNMEAFormToSerial() : SetNMEAFormToNet();
+#endif
+
   m_connection_enabled = TRUE;
 
   // Reset touch flag
-  connectionsaved = true;
-
+  connectionsaved = false;
 }
 
 bool options::SortSourceList(void) {
@@ -10188,6 +10252,7 @@ void options::OnAddDatasourceClick(wxCommandEvent& event) {
 
   connectionsaved = FALSE;
   SetDefaultConnectionParams();
+
   m_sbConnEdit->SetLabel(_("Configure new connection"));
 
   m_buttonRemove->Hide();//Disable();
@@ -10430,13 +10495,13 @@ void SentenceListDlg::OnCLBSelect(wxCommandEvent& e) {
 
 void SentenceListDlg::OnAddClick(wxCommandEvent& event) {
   wxTextEntryDialog textdlg(
-      this, _("Enter the NMEA sentence (2, 3 or 5 characters) "),
+    this, _("Enter the NMEA sentence (2, 3 or 5 characters)\n  or a valid REGEX expression (6 characters or longer)"),
       _("Enter the NMEA sentence"));
 #if wxCHECK_VERSION(2, 9, 0)
-  textdlg.SetMaxLength(5);
+//  textdlg.SetMaxLength(5);
 #endif
 
-  textdlg.SetTextValidator(wxFILTER_ALPHANUMERIC);
+  textdlg.SetTextValidator(wxFILTER_ASCII);
   if (textdlg.ShowModal() == wxID_CANCEL) return;
   wxString stc = textdlg.GetValue();
 
@@ -10445,19 +10510,38 @@ void SentenceListDlg::OnAddClick(wxCommandEvent& event) {
     m_clbSentences->Check(m_clbSentences->FindString(stc));
     return;
   }
-
-  OCPNMessageBox(
+  else if (stc.Length() < 2){
+      OCPNMessageBox(
       this,
       _("An NMEA sentence is generally 3 characters long (like RMC, GGA etc.)\n \
           It can also have a two letter prefix identifying the source, or TALKER, of the message.\n \
           The whole sentences then looks like GPGGA or AITXT.\n \
-          You may filter out all the sentences with certain TALKER prefix (like GP, AI etc.).\n\n \
-          The filter accepts just these three formats."),
+          You may filter out all the sentences with certain TALKER prefix (like GP, AI etc.).\n \
+          The filter also accepts Regular Expressions (REGEX) with 6 or more characters. \n\n"),
       _("OpenCPN Info"));
+      return;
+  }
+
+  else {
+    // Verify that a longer text entry is a valid RegEx
+    wxRegEx r(stc);
+    if( r.IsValid() ){
+      m_clbSentences->Append(stc);
+      m_clbSentences->Check(m_clbSentences->FindString(stc));
+      return;
+    }
+    else{
+      OCPNMessageBox(
+          this,
+          _("REGEX syntax error: \n") + stc,
+            _("OpenCPN Info"));
+      return;
+    }
+  }
 }
 
 void SentenceListDlg::OnDeleteClick(wxCommandEvent& event) {
-  m_clbSentences->Delete(event.GetSelection());
+    m_clbSentences->Delete(m_clbSentences->GetSelection());
 }
 
 void SentenceListDlg::OnClearAllClick(wxCommandEvent& event) {

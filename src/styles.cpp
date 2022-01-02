@@ -229,7 +229,28 @@ bool Style::NativeToolIconExists(const wxString & name)
     
 
 // Tools and Icons perform on-demand loading and dimming of bitmaps.
-// Changing color scheme invalidatres all loaded bitmaps.
+// Changing color scheme invalidates all loaded bitmaps.
+
+wxBitmap Style::GetIconScaled(const wxString& name, double scaleFactor,
+                        bool bforceReload) {
+  if (iconIndex.find(name) == iconIndex.end()) {
+    wxString msg(_T("The requested icon was not found in the style: "));
+    msg += name;
+    wxLogMessage(msg);
+    return wxBitmap(GetToolSize().x, GetToolSize().y);  // Prevents crashing.
+  }
+
+  int index = iconIndex[name];  // FIXME: this operation is not const but should
+                                // be, use 'find'
+
+  Icon* icon = (Icon*)icons[index];
+  if (icon->size.x == 0) icon->size = toolSize[currentOrientation];
+
+  return GetIcon( name,
+                  icon->size.x * scaleFactor,
+                  icon->size.y * scaleFactor,
+                  bforceReload);
+}
 
 wxBitmap Style::GetIcon(const wxString & name, int width, int height, bool bforceReload)
 {
@@ -800,7 +821,11 @@ void StyleManager::Init(const wxString & fromPath)
     if( !wxDir::Exists( fromPath ) ) {
         wxString msg = _T("No styles found at: ");
         msg << fromPath;
+#ifdef __WXOSX__
+      // macOS: /Users/heidi/Library/Preferences/opencpn/.opencpn/
+#else
         wxLogMessage( msg );
+#endif
         return;
     }
 
@@ -816,7 +841,11 @@ void StyleManager::Init(const wxString & fromPath)
     if( !more ) {
         wxString msg = _T("No styles found at: ");
         msg << fromPath;
+#ifdef __WXOSX__
+        // macOS: /Users/heidi/Library/Preferences/opencpn/
+#else
         wxLogMessage( msg );
+#endif
         return;
     }
 

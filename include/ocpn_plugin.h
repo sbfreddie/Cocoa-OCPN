@@ -751,8 +751,11 @@ extern "C" DECL_EXP double toUsrDistance_Plugin( double nm_distance, int unit = 
 extern "C" DECL_EXP double fromUsrDistance_Plugin( double usr_distance, int unit = -1 );
 extern "C" DECL_EXP double toUsrSpeed_Plugin( double kts_speed, int unit = -1 );
 extern "C" DECL_EXP double fromUsrSpeed_Plugin( double usr_speed, int unit = -1 );
+extern "C" DECL_EXP double toUsrTemp_Plugin(double cel_temp, int unit = -1);
+extern "C" DECL_EXP double fromUsrTemp_Plugin(double usr_temp, int unit = -1);
 extern DECL_EXP wxString getUsrDistanceUnit_Plugin( int unit = -1 );
 extern DECL_EXP wxString getUsrSpeedUnit_Plugin( int unit = -1 );
+extern DECL_EXP wxString getUsrTempUnit_Plugin(int unit = -1);
 extern DECL_EXP wxString GetNewGUID();
 extern "C" DECL_EXP bool PlugIn_GSHHS_CrossesLand(double lat1, double lon1, double lat2, double lon2);
 /**
@@ -1292,7 +1295,7 @@ extern DECL_EXP void PlugInHandleAutopilotRoute(bool enable);
 
 // API 1.16
 //
-/**
+/* *
  * Return the plugin data directory for a given directory name.
  *
  * On Linux, the returned data path is an existing directory ending in
@@ -1339,6 +1342,10 @@ extern DECL_EXP int GetCanvasCount( );
 extern DECL_EXP bool CheckMUIEdgePan_PlugIn( int x, int y, bool dragging, int margin, int delta, int canvasIndex );
 extern DECL_EXP void SetMUICursor_PlugIn( wxCursor *pCursor, int canvasIndex );
 
+// API 1.17
+//
+extern DECL_EXP wxRect GetMasterToolbarRect();
+
 enum SDDMFORMAT
 {
     DEGREES_DECIMAL_MINUTES = 0,
@@ -1348,5 +1355,90 @@ enum SDDMFORMAT
 };
 
 extern DECL_EXP int GetLatLonFormat(void);
+
+// API 1.17
+extern "C" DECL_EXP void ZeroXTE();
+
+// Extended Waypoint manipulation API
+class DECL_EXP PlugIn_Waypoint_Ex {
+public:
+  PlugIn_Waypoint_Ex();
+  PlugIn_Waypoint_Ex(double lat, double lon,
+                                 const wxString &icon_ident,
+                                 const wxString &wp_name,
+                                 const wxString &GUID = "",
+                                 const double ScaMin = 1e9,
+                                 const bool bNameVisible = false,
+                                 const int nRanges = 0,
+                                 const double RangeDistance = 1.0,
+                                 const wxColor RangeColor = wxColor( 255,0,0 ) );
+  ~PlugIn_Waypoint_Ex();
+    void InitDefaults();
+
+  bool GetFSStatus();     // return "free standing" status
+                          // To be a "free standing waypoint"(FSWP),
+                          // the RoutePoint will have been created by GUI dropping a point;
+                          // by importing a waypoint in a GPX file
+                          // or by the AddSingleWaypoint API.
+
+  int GetRouteMembershipCount();    // Return the number of routes to which this WP belongs
+
+  double m_lat;
+  double m_lon;
+
+  wxString m_GUID;
+
+  wxString m_MarkName;
+  wxString m_MarkDescription;
+  wxDateTime m_CreateTime;
+  bool IsVisible;
+  bool IsActive;
+
+  double scamin;
+  bool b_useScamin;
+  bool IsNameVisible;
+  int nrange_rings;
+  double RangeRingSpace;
+  wxColour RangeRingColor;
+
+  wxString IconName;
+  wxString IconDescription;
+
+  Plugin_HyperlinkList *m_HyperlinkList;
+};
+
+WX_DECLARE_LIST(PlugIn_Waypoint_Ex, Plugin_WaypointExList);
+
+class DECL_EXP PlugIn_Route_Ex {
+public:
+  PlugIn_Route_Ex(void);
+  ~PlugIn_Route_Ex(void);
+
+  wxString m_NameString;
+  wxString m_StartString;
+  wxString m_EndString;
+  wxString m_GUID;
+  bool m_isActive;
+
+  Plugin_WaypointExList *pWaypointList;
+};
+
+extern DECL_EXP wxArrayString GetRouteGUIDArray(void);
+extern DECL_EXP wxArrayString GetTrackGUIDArray(void);
+
+extern DECL_EXP bool GetSingleWaypointEx(wxString GUID,
+                                         PlugIn_Waypoint_Ex *pwaypoint);
+
+extern DECL_EXP bool AddSingleWaypointEx(PlugIn_Waypoint_Ex *pwaypoint, bool b_permanent = true);
+extern DECL_EXP bool UpdateSingleWaypointEx(PlugIn_Waypoint_Ex *pwaypoint);
+
+extern DECL_EXP bool AddPlugInRouteEx(PlugIn_Route_Ex *proute, bool b_permanent = true);
+extern DECL_EXP bool UpdatePlugInRouteEx(PlugIn_Route_Ex *proute);
+
+extern DECL_EXP std::unique_ptr<PlugIn_Waypoint_Ex> GetWaypointEx_Plugin(const wxString &);
+extern DECL_EXP std::unique_ptr<PlugIn_Route_Ex> GetRouteEx_Plugin(const wxString &);
+
+extern DECL_EXP wxString GetActiveWaypointGUID(void);    // if no active waypoint, returns wxEmptyString
+extern DECL_EXP wxString GetActiveRouteGUID(void);    // if no active route, returns wxEmptyString
 
 #endif //_PLUGIN_H_

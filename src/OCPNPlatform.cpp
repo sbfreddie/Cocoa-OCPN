@@ -204,7 +204,9 @@ extern wxArrayString             g_locale_catalog_array;
 
 #endif
 extern int                       options_lastPage;
-
+extern int                        g_maintoolbar_x;
+extern int                        g_maintoolbar_y;
+extern wxArrayString TideCurrentDataSet;
 
 //  OCPN Platform implementation
 
@@ -358,15 +360,22 @@ bool OCPNPlatform::DetectOSDetail( OCPN_OSDetail *detail)
     wxPlatformInfo platformInfo = wxPlatformInfo::Get();
     wxArchitecture arch = platformInfo.GetArchitecture();
     if(arch == wxARCH_32)
-        detail->osd_arch = std::string("X86_32");
+        detail->osd_arch = std::string("i386");
 
 #ifdef ocpnARM
-    detail->osd_arch = std::string("ARM64");
-    if(arch == wxARCH_32)
-        detail->osd_arch = std::string("ARMHF");
+    //  arm supports a multiarch runtime environment
+    //  That is, the OS may be 64 bit, but OCPN may be built as a 32 bit binary
+    //  So, we cannot trust the wxPlatformInfo architecture determination.
+    detail->osd_arch = std::string("arm64");
+#ifdef ocpnARMHF
+    detail->osd_arch = std::string("armhf");
+#endif
 #endif
 
-
+#ifdef __OCPN__ANDROID__
+  detail->osd_arch = std::string("arm64");
+  if (arch == wxARCH_32) detail->osd_arch = std::string("armhf");
+#endif
 
     return true;
 }
@@ -1241,8 +1250,8 @@ void OCPNPlatform::SetUpgradeOptions( wxString vNew, wxString vOld )
 
     // This is ugly hack
     // TODO
-    pConfig->SetPath( _T ( "/PlugIns/liboesenc_pi.so" ) );
-    pConfig->Write( _T ( "bEnabled" ), true );
+    //pConfig->SetPath( _T ( "/PlugIns/liboesenc_pi.so" ) );
+    //pConfig->Write( _T ( "bEnabled" ), true );
 
 
 #endif
@@ -1283,8 +1292,13 @@ void OCPNPlatform::SetUpgradeOptions( wxString vNew, wxString vOld )
         g_bAIS_GCPA_Alert_Audio = true;
         g_bAIS_SART_Alert_Audio = true;
         g_bAIS_DSC_Alert_Audio = true;
-    }
 
+        // Force a recalculation of default main toolbar location
+        g_maintoolbar_x = -1;
+
+        // Force a reload of updated default tide/current datasets
+        TideCurrentDataSet.Clear();
+    }
 }
 
 

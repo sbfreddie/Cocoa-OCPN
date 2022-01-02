@@ -278,7 +278,7 @@ class MarkInfoDlg : public wxFrame
         wxStaticText*           m_staticTextShowNameExt;
         wxStaticText*           m_staticTextRR1;
         wxStaticText*           m_staticTextRR2;
-        wxStaticText*           m_RangeRingUnits;
+        wxChoice*               m_RangeRingUnits;
         wxStaticText*           m_staticTextRR4;
         wxStaticText*           m_staticTextArrivalUnits;
         wxStaticText*           m_staticTextPlSpeed;
@@ -336,7 +336,11 @@ class MarkInfoDlg : public wxFrame
         void ShowTidesBtnClicked( wxCommandEvent& event );
         
     public:
-        MarkInfoDlg( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Waypoint Properties"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1, -1 ), long style = wxDEFAULT_FRAME_STYLE|wxFRAME_FLOAT_ON_PARENT|wxMAXIMIZE_BOX|wxRESIZE_BORDER );
+#ifdef __WXOSX__
+    MarkInfoDlg( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Waypoint Properties"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1, -1 ), long style = wxDEFAULT_FRAME_STYLE|wxFRAME_FLOAT_ON_PARENT|wxMAXIMIZE_BOX|wxRESIZE_BORDER );
+#else
+    MarkInfoDlg( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Waypoint Properties"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1, -1 ), long style = FRAME_WITH_LINKS_STYLE );
+#endif
         ~MarkInfoDlg();
         void Create();
         void InitialFocus(void);
